@@ -95,7 +95,7 @@ fn main() {
         steps: Vec::new(),
     };
     for include_file in &main_mend.include {
-        let include_contents = match fs::read_to_string(parent_dir.join(&include_file)) {
+        let include_contents = match fs::read_to_string(parent_dir.join(include_file)) {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("Could not read include file `{}` {}", &include_file, e);
