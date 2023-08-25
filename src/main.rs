@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Error};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -59,23 +59,34 @@ struct HookRunForTag {
 }
 
 fn main() {
-    let cli = Cli::parse();
+    run(&Cli::parse());
+    std::process::exit(1);
+}
+
+fn run(cli: &Cli) {
+    if let Ok(merged_mend) = load_mend(cli) {
+        if let Ok(text) = toml::to_string_pretty(&merged_mend) {
+            println!("{}", text);
+        } else {
+            exit(1);
+        }
+    } else {
+        exit(1);
+    }
+
+}
+
+fn load_mend(cli: &Cli) -> Result<Mend, Error> {
     let parent_dir = Path::new(&cli.file)
         .parent()
         .expect("Unable to get the parent directory");
 
-    // file.read_to_string(&mut contents).expect("Unable to read the file");
 
     let contents = match fs::read_to_string(&cli.file) {
-        // If successful return the files text as `contents`.
-        // `c` is a local variable.
         Ok(c) => c,
-        // Handle the `error` case.
         Err(e) => {
-            // Write `msg` to `stderr`.
             eprintln!("Could not read file `{}` {}", &cli.file, e);
-            // Exit the program with exit code `1`.
-            exit(1);
+            panic!()
         }
     };
 
@@ -83,7 +94,7 @@ fn main() {
         Ok(d) => d,
         Err(e) => {
             eprintln!("Unable to load data from `{}` {}", &cli.file, e);
-            exit(1);
+            panic!()
         }
     };
     let mut merged_mend: Mend = Mend {
@@ -99,14 +110,14 @@ fn main() {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("Could not read include file `{}` {}", &include_file, e);
-                exit(1);
+                panic!();
             }
         };
         let include_mend: Mend = match toml::from_str(&include_contents) {
             Ok(d) => d,
             Err(e) => {
                 eprintln!("Unable to load data from `{}` {}", &include_file, e);
-                exit(1);
+                panic!();
             }
         };
         if !include_mend.steps.is_empty() {
@@ -114,7 +125,7 @@ fn main() {
                 "We only allow includes 1 level deep, sorry. Please restructure `{}`",
                 &include_file
             );
-            exit(1);
+            panic!();
         }
         extend_mend(&mut merged_mend, include_mend);
     }
@@ -128,11 +139,7 @@ fn main() {
             None => {}
         }
     }
-
-    if let Ok(text) = toml::to_string_pretty(&merged_mend) {
-        println!("{}", text);
-    }
-    std::process::exit(1);
+    Ok(merged_mend)
 }
 
 fn extend_mend(merged_mend: &mut Mend, include_mend: Mend) {
@@ -142,5 +149,23 @@ fn extend_mend(merged_mend: &mut Mend, include_mend: Mend) {
     merged_mend.hooks.extend(include_mend.hooks);
     for ele in include_mend.steps {
         merged_mend.steps.push(ele)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use crate::{Cli, load_mend};
+
+    #[test]
+    fn it_works() {
+        let mut toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        toml_path.push("examples/mend.toml");
+        let args = Cli {
+            file: String::from(toml_path.to_str().unwrap())
+        };
+        let loaded = load_mend(&args);
+        insta::assert_yaml_snapshot!(loaded.expect("Failed loading"));
     }
 }
