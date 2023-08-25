@@ -7,7 +7,9 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0.29", features = ["derive"] }
-dockerfile-parser = "0.8.0"
 indicatif = "0.17.6"
 serde = { version = "1.0.187", features = ["derive"] }
 toml = "0.7.6"
+
+[dev-dependencies]
+insta = { version = "1.31.0", features = ["yaml"] }

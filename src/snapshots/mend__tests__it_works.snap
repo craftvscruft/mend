@@ -6,30 +6,19 @@ from:
   sha: 43a3a253
 include: []
 env:
+  DEFAULT_FILe: main.c
   JAVA_HOME: /Library/Java/JavaVirtualMachines/graalvm-jdk-20.0.2+9.1/Contents/Home/
   PATH: "$PATH:/Users/rmyers/dev/untangler/build/install/untangler/bin"
-  DEFAULT_FILe: main.c
 recipes:
+  format:
+    run: clang-format -i $DEFAULT_FILE
+    commit_template: d - Format
+    tag: ~
+    tags:
+      - binary_identical
   move_includes_to_top:
     run: "    grep \"^#include\" $DEFAULT_FILE > a.tmp && grep -v \"^#include\" $DEFAULT_FILE >> a.tmp && mv a.tmp $DEFAULT_FILE'\n  "
     commit_template: r - Move includes to top
-    tag: ~
-    tags:
-      - binary_identical
-  rename:
-    run: untangler rename $1 $2 -w -f $DEFAULT_FILE
-    commit_template: R - Rename $1 to $2
-    tag: ~
-    tags: []
-  remove_comments_in_includes:
-    run: "    perl -pi -e ''s{^#include */\\*((?!\\*/).)*\\*/}{#include}gs'' $DEFAULT_FILE\n  "
-    commit_template: d - Remove comments in includes
-    tag: ~
-    tags:
-      - binary_identical
-  split_declarations:
-    run: "    untangler misc split-declaration \"*\" -w\n  "
-    commit_template: r - Split declarations
     tag: ~
     tags:
       - binary_identical
@@ -39,9 +28,20 @@ recipes:
     tag: ~
     tags:
       - binary_identical
-  format:
-    run: clang-format -i $DEFAULT_FILE
-    commit_template: d - Format
+  remove_comments_in_includes:
+    run: "    perl -pi -e ''s{^#include */\\*((?!\\*/).)*\\*/}{#include}gs'' $DEFAULT_FILE\n  "
+    commit_template: d - Remove comments in includes
+    tag: ~
+    tags:
+      - binary_identical
+  rename:
+    run: untangler rename $1 $2 -w -f $DEFAULT_FILE
+    commit_template: R - Rename $1 to $2
+    tag: ~
+    tags: []
+  split_declarations:
+    run: "    untangler misc split-declaration \"*\" -w\n  "
+    commit_template: r - Split declarations
     tag: ~
     tags:
       - binary_identical

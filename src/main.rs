@@ -1,6 +1,6 @@
 use clap::{Parser, Error};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::process::exit;
@@ -18,13 +18,13 @@ struct Mend {
     include: Vec<String>,
 
     #[serde(default)]
-    env: HashMap<String, String>,
+    env: BTreeMap<String, String>,
 
     #[serde(default)]
-    recipes: HashMap<String, Recipe>,
+    recipes: BTreeMap<String, Recipe>,
 
     #[serde(default)]
-    hooks: HashMap<String, Hook>,
+    hooks: BTreeMap<String, Hook>,
 
     #[serde(default)]
     steps: Vec<String>,
@@ -100,9 +100,9 @@ fn load_mend(cli: &Cli) -> Result<Mend, Error> {
     let mut merged_mend: Mend = Mend {
         from: None,
         include: Vec::new(),
-        env: HashMap::new(),
-        recipes: HashMap::new(),
-        hooks: HashMap::new(),
+        env: BTreeMap::new(),
+        recipes: BTreeMap::new(),
+        hooks: BTreeMap::new(),
         steps: Vec::new(),
     };
     for include_file in &main_mend.include {
