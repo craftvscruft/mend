@@ -1,0 +1,33 @@
+from = { sha = "43a3a253" }
+include = [ "mend-recipes.toml" ]
+
+steps = [
+  "remove_comments_in_includes",
+  "remove_comments",
+  "format",
+  "move_includes_to_top",
+  "split_declarations",
+  "rename B calculate_value",
+  "rename b evaluate_and_draw_interval",
+  "rename X control_points",
+  "rename P point_value",
+  "rename O offset",
+  "rename m pixel_index",
+  "rename k color_value",
+  "rename S screen_buffer"
+]
+
+[env]
+DEFAULT_FILe = "main.c"
+JAVA_HOME = "/Library/Java/JavaVirtualMachines/graalvm-jdk-20.0.2+9.1/Contents/Home/"
+PATH = "$PATH:/Users/rmyers/dev/untangler/build/install/untangler/bin"
+
+[hooks.before_step.run_for_tag]
+tag = "binary_identical"
+run = "make && cp a.out a.bak"
+else_run = "make"
+
+[hooks.after_step.run_for_tag]
+tag = "binary_identical"
+run = "diff a.out a.out.bak"
+else_run = "make test"

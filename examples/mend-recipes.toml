@@ -1,0 +1,44 @@
+[recipes]
+
+# Code altering recipes
+
+[recipes.rename]
+  run = 'untangler rename $1 $2 -w -f $DEFAULT_FILE'
+  commit_template = "R - Rename $1 to $2"
+
+# Binary identical recipes
+
+[recipes.format]
+  run = 'clang-format -i $DEFAULT_FILE'
+  commit_template = "d - Format"
+  tag = 'binary_identical'
+
+[recipes.move_includes_to_top]
+  run = """
+    grep "^#include" $DEFAULT_FILE > a.tmp && \
+    grep -v "^#include" $DEFAULT_FILE >> a.tmp && \
+    mv a.tmp $DEFAULT_FILE'
+  """
+  commit_template = "r - Move includes to top"
+  tag = 'binary_identical'
+
+[recipes.remove_comments_in_includes]
+  run = '''
+    perl -pi -e ''s{^#include */\*((?!\*/).)*\*/}{#include}gs'' $DEFAULT_FILE
+  '''
+  commit_template = "d - Remove comments in includes"
+  tag = 'binary_identical'
+
+[recipes.remove_comments]
+  run = '''
+    untangler remove comment "*" --sub=" " -w
+  '''
+  commit_template = "d - Remove comments"
+  tag = 'binary_identical'
+
+[recipes.split_declarations]
+  run = '''
+    untangler misc split-declaration "*" -w
+  '''
+  commit_template = "r - Split declarations"
+  tag = 'binary_identical'
