@@ -27,10 +27,25 @@ fn resolve_step_instruction(instruction: String, mend: &Mend) -> String {
     for (recipe_name, recipe) in &mend.recipes {
         if instruction.contains(recipe_name.as_str()) {
             let recipe_fn = format!("function {} () {{\n{}\n}}\n", recipe_name, recipe.run);
-            resolved_instruction.push_str(&recipe_fn)
+            resolved_instruction.push_str(&recipe_fn);
         }
     }
+    if let Some(hook) = mend.hooks.get("before_step") {
+        if let Some(hook_run) = &hook.run {
+            resolved_instruction.push_str(&hook_run);
+            resolved_instruction.push_str("\n")
+        }
+    }
+
     resolved_instruction.push_str(&instruction);
+    resolved_instruction.push_str("\n");
+
+    if let Some(hook) = mend.hooks.get("after_step") {
+        if let Some(hook_run) = &hook.run {
+            resolved_instruction.push_str(&hook_run);
+            resolved_instruction.push_str("\n")
+        }
+    }
     resolved_instruction
 }
 
@@ -52,7 +67,7 @@ fn create_run_status_from_mend(mend: Mend) -> RunStatus {
 #[cfg(test)]
 mod tests {
     use std::os::macos::raw::stat;
-    use crate::{Mend, Recipe};
+    use crate::{Hook, Mend, Recipe};
     use crate::run::create_run_status_from_mend;
 
     #[test]
@@ -88,6 +103,25 @@ mod tests {
             commit_template: None,
             tag: None,
             tags: vec![],
+        });
+        let status = create_run_status_from_mend(mend);
+        assert_eq!(status.steps.len(), 1);
+        insta::assert_yaml_snapshot!(status);
+    }
+
+    #[test]
+    fn test_create_run_status_include_hooks() {
+        let mut mend = create_mend_with_steps(vec![
+            "cmd arg1 arg2".to_string()
+        ]);
+
+        mend.hooks.insert("before_step".to_string(), Hook {
+            run: Option::from("echo Hello before".to_string()),
+            run_for_tag: None,
+        });
+        mend.hooks.insert("after_step".to_string(), Hook {
+            run: Option::from("echo Hello after".to_string()),
+            run_for_tag: None,
         });
         let status = create_run_status_from_mend(mend);
         assert_eq!(status.steps.len(), 1);
