@@ -1,14 +1,17 @@
+use anyhow::Context;
+use shellexpand;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use anyhow::Context;
 use which::which;
-use shellexpand;
 
-pub fn ensure_worktree(repo_dir: &Path, work_dir_relative : &str, sha : &str) -> PathBuf {
+pub fn ensure_worktree(repo_dir: &Path, work_dir_relative: &str, sha: &str) -> PathBuf {
     let work_dir_joined = repo_dir.join(work_dir_relative);
-    eprintln!("Creating worktree at {} in repo at {}", work_dir_joined.to_str().unwrap(), repo_dir.to_str().unwrap());
-
+    eprintln!(
+        "Creating worktree at {} in repo at {}",
+        work_dir_joined.to_str().unwrap(),
+        repo_dir.to_str().unwrap()
+    );
 
     let git_cmd = which("git").expect("Could resolve git command");
     if work_dir_joined.exists() {
@@ -58,24 +61,30 @@ fn current_short_sha(repo_dir: &Path) -> anyhow::Result<String> {
         .args(["rev-parse", "--short", "HEAD"])
         .output()
         .expect("Could not get sha");
-    Ok(String::from_utf8(output.stdout).with_context(|| "Could not get sha")?.trim().parse()?)
+    Ok(String::from_utf8(output.stdout)
+        .with_context(|| "Could not get sha")?
+        .trim()
+        .parse()?)
 }
-
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{File};
+    use std::fs::File;
     use std::process::Command;
     use tempfile::tempdir_in;
 
     use crate::repo::{commit_all, current_short_sha, ensure_worktree, reset_hard};
 
-
     #[test]
     fn git_commands() {
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_subdir = tempdir_in(&temp_dir).unwrap();
-        let worktree_rel = temp_subdir.path().strip_prefix(temp_dir.path()).unwrap().to_str().unwrap();
+        let worktree_rel = temp_subdir
+            .path()
+            .strip_prefix(temp_dir.path())
+            .unwrap()
+            .to_str()
+            .unwrap();
         let repo_dir = temp_dir.path();
         let worktree_dir = repo_dir.join(worktree_rel);
 
@@ -92,7 +101,7 @@ mod tests {
             .spawn()
             .expect("Could not git add  myfile");
 
-        commit_all(repo_dir,"Initial");
+        commit_all(repo_dir, "Initial");
 
         let short_sha = current_short_sha(repo_dir).unwrap();
         ensure_worktree(repo_dir, worktree_rel, short_sha.as_str());

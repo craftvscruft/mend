@@ -1,14 +1,13 @@
-use std::path::Path;
-use std::fs;
-use std::collections::BTreeMap;
-use anyhow::{anyhow, Context};
 use crate::{Cli, Mend};
+use anyhow::{anyhow, Context};
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
 
-pub fn load_mend(cli: &Cli) ->anyhow::Result<Mend> {
+pub fn load_mend(cli: &Cli) -> anyhow::Result<Mend> {
     let parent_dir = Path::new(&cli.file)
         .parent()
         .expect("Unable to get the parent directory");
-
 
     let contents = match fs::read_to_string(&cli.file) {
         Ok(c) => c,
@@ -19,7 +18,7 @@ pub fn load_mend(cli: &Cli) ->anyhow::Result<Mend> {
     };
 
     let main_mend: Mend = toml::from_str(&contents)
-    .with_context(|| format!("Unable to load data from `{}`", &cli.file))?;
+        .with_context(|| format!("Unable to load data from `{}`", &cli.file))?;
 
     let mut merged_mend: Mend = Mend {
         from: None,
@@ -35,7 +34,10 @@ pub fn load_mend(cli: &Cli) ->anyhow::Result<Mend> {
         let include_mend: Mend = toml::from_str(&include_contents)
             .with_context(|| format!("Unable to load data from `{}`", &include_file))?;
         if !include_mend.steps.is_empty() {
-            return Err(anyhow!("We only allow includes 1 level deep, sorry. Please restructure `{}`", &include_file))
+            return Err(anyhow!(
+                "We only allow includes 1 level deep, sorry. Please restructure `{}`",
+                &include_file
+            ));
         }
         crate::extend_mend(&mut merged_mend, include_mend);
     }

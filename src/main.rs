@@ -1,13 +1,11 @@
-
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
-
-use std::process::exit;
 use crate::repo::ensure_worktree;
+use std::process::exit;
 
 mod config;
 mod repo;
@@ -71,7 +69,7 @@ fn main() {
     run(&Cli::parse());
 }
 
-fn drive(mend : Mend) {
+fn drive(mend: Mend) {
     let from = mend.from.expect("No from declared in config");
     // repo could be remote but for now assume a local checkout
     let repo_dir_raw = Path::new(&from.repo);
@@ -87,24 +85,21 @@ fn expand_path(repo_dir_raw: &Path) -> PathBuf {
 
 fn run(cli: &Cli) {
     match config::load_mend(cli) {
-        Ok(merged_mend) => {
-            match toml::to_string_pretty(&merged_mend) {
-                Ok(text) => {
-                    println!("{}", text);
-                    drive(merged_mend)
-                }
-                Err(e) => {
-                    eprintln!("{e}");
-                    exit(1);
-                }
+        Ok(merged_mend) => match toml::to_string_pretty(&merged_mend) {
+            Ok(text) => {
+                println!("{}", text);
+                drive(merged_mend)
             }
-        }
+            Err(e) => {
+                eprintln!("{e}");
+                exit(1);
+            }
+        },
         Err(e) => {
             eprintln!("{e}");
             exit(1);
         }
     }
-
 }
 
 fn extend_mend(merged_mend: &mut Mend, include_mend: Mend) {
@@ -121,15 +116,15 @@ fn extend_mend(merged_mend: &mut Mend, include_mend: Mend) {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::Cli;
     use crate::config::load_mend;
+    use crate::Cli;
 
     #[test]
     fn it_works() {
         let mut toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         toml_path.push("examples/mend.toml");
         let args = Cli {
-            file: String::from(toml_path.to_str().unwrap())
+            file: String::from(toml_path.to_str().unwrap()),
         };
         let loaded = load_mend(&args);
         insta::assert_yaml_snapshot!(loaded.expect("Failed loading"));
