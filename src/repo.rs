@@ -10,7 +10,7 @@ fn ensure_worktree(repo_dir: &Path, work_dir_relative : &str, sha : &str) {
             .arg("worktree")
             .arg("remove")
             .arg("--force")
-            .arg(&work_dir_relative)
+            .arg(work_dir_relative)
             .spawn();
     }
 
@@ -20,7 +20,7 @@ fn ensure_worktree(repo_dir: &Path, work_dir_relative : &str, sha : &str) {
         .arg("add")
         .arg("--force")
         .arg(work_dir_joined)
-        .arg(&sha)
+        .arg(sha)
         .spawn()
         .expect("Could not created worktree");
 }
@@ -53,7 +53,7 @@ fn current_short_sha(repo_dir: &Path) -> anyhow::Result<String> {
         .args(["rev-parse", "--short", "HEAD"])
         .output()
         .expect("Could not get sha");
-    return Ok(String::from_utf8(output.stdout).with_context(|| "Could not get sha")?.trim().parse()?);
+    Ok(String::from_utf8(output.stdout).with_context(|| "Could not get sha")?.trim().parse()?)
 }
 
 
@@ -70,32 +70,32 @@ mod tests {
     fn git_commands() {
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_subdir = tempdir_in(&temp_dir).unwrap();
-        let worktree_rel = temp_subdir.path().strip_prefix(&temp_dir.path()).unwrap().to_str().unwrap();
+        let worktree_rel = temp_subdir.path().strip_prefix(temp_dir.path()).unwrap().to_str().unwrap();
         let repo_dir = temp_dir.path();
         let worktree_dir = repo_dir.join(worktree_rel);
 
         let _ = Command::new("git")
-            .current_dir(&repo_dir)
+            .current_dir(repo_dir)
             .arg("init")
             .spawn()
             .expect("Could not init");
         let _ = File::create(repo_dir.join("myfile")).unwrap();
 
         let _ = Command::new("git")
-            .current_dir(&repo_dir)
+            .current_dir(repo_dir)
             .args(["add", "myfile"])
             .spawn()
             .expect("Could not git add  myfile");
 
         commit_all(repo_dir,"Initial");
 
-        let short_sha = current_short_sha(&repo_dir).unwrap();
-        ensure_worktree(&repo_dir, worktree_rel, short_sha.as_str());
+        let short_sha = current_short_sha(repo_dir).unwrap();
+        ensure_worktree(repo_dir, worktree_rel, short_sha.as_str());
         reset_hard(&worktree_dir);
 
         assert_eq!(short_sha, current_short_sha(&worktree_dir).unwrap());
         // Can call ensure_worktree twice on the same directory
-        ensure_worktree(&repo_dir, worktree_rel, short_sha.as_str());
+        ensure_worktree(repo_dir, worktree_rel, short_sha.as_str());
         assert_eq!(short_sha, current_short_sha(&worktree_dir).unwrap());
         // Hold onto references
         let _ = temp_subdir.close();
