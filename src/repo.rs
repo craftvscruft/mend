@@ -1,5 +1,5 @@
 use anyhow::Context;
-use shellexpand;
+
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -16,13 +16,13 @@ pub fn ensure_worktree(repo_dir: &Path, work_dir_relative: &str, sha: &str) -> P
     let git_cmd = which("git").expect("Could resolve git command");
     if work_dir_joined.exists() {
         let _ = Command::new(&git_cmd)
-            .current_dir(&repo_dir)
+            .current_dir(repo_dir)
             .args(["worktree", "remove", "--force", work_dir_relative])
             .spawn();
     }
 
     let worktree_result = Command::new(&git_cmd)
-        .current_dir(&repo_dir)
+        .current_dir(repo_dir)
         .args(["worktree", "add", "--force", work_dir_relative, sha])
         .output();
     if let Err(e) = &worktree_result {

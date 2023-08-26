@@ -74,8 +74,8 @@ fn drive(mend: Mend) {
     // repo could be remote but for now assume a local checkout
     let repo_dir_raw = Path::new(&from.repo);
     // Multiple concurrent runs will stomp on each other. Choose unique dir?
-    let repo_dir = expand_path(&repo_dir_raw);
-    let worktree_dir = ensure_worktree(repo_dir.as_path(), ".mend/worktree2", &from.sha);
+    let repo_dir = expand_path(repo_dir_raw);
+    let _worktree_dir = ensure_worktree(repo_dir.as_path(), ".mend/worktree2", &from.sha);
 }
 
 fn expand_path(repo_dir_raw: &Path) -> PathBuf {
