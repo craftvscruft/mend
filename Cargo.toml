@@ -14,3 +14,4 @@ toml = "0.7.6"
 
 [dev-dependencies]
 insta = { version = "1.31.0", features = ["yaml"] }
+tempfile = "3.8.0"

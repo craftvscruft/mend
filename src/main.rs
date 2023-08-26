@@ -8,6 +8,7 @@ use std::fmt::Debug;
 use std::process::exit;
 
 mod config;
+mod repo;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
