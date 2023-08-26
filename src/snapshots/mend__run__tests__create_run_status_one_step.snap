@@ -1,0 +1,12 @@
+---
+source: src/run.rs
+expression: status
+---
+steps:
+  - run: cmd arg1 arg2
+    run_resolved: cmd arg1 arg2
+    commit_msg: cmd arg1 arg2
+    sha: ~
+    status: Pending
+    output: ~
+
