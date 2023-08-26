@@ -8,12 +8,12 @@ use std::path::Path;
 use std::process::exit;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct Cli {
+pub struct Cli {
     #[arg(short='f', long="file", default_value_t=String::from("mend.toml"))]
     file: String,
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Mend {
+pub struct Mend {
     from: Option<From>,
 
     #[serde(default)]
@@ -33,12 +33,12 @@ struct Mend {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct From {
+pub struct From {
     sha: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Recipe {
+pub struct Recipe {
     run: String,
     commit_template: Option<String>,
     tag: Option<String>,
@@ -48,13 +48,13 @@ struct Recipe {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Hook {
+pub struct Hook {
     run: Option<String>,
     run_for_tag: Option<HookRunForTag>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct HookRunForTag {
+pub struct HookRunForTag {
     tag: String,
     run: String,
     else_run: Option<String>,
