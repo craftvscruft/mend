@@ -3,9 +3,11 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::path::{Path, PathBuf};
 
 
 use std::process::exit;
+use crate::repo::ensure_worktree;
 
 mod config;
 mod repo;
@@ -39,6 +41,7 @@ pub struct Mend {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct From {
     sha: String,
+    repo: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -68,12 +71,27 @@ fn main() {
     run(&Cli::parse());
 }
 
+fn drive(mend : Mend) {
+    let from = mend.from.expect("No from declared in config");
+    // repo could be remote but for now assume a local checkout
+    let repo_dir_raw = Path::new(&from.repo);
+    // Multiple concurrent runs will stomp on each other. Choose unique dir?
+    let repo_dir = expand_path(&repo_dir_raw);
+    let worktree_dir = ensure_worktree(repo_dir.as_path(), ".mend/worktree2", &from.sha);
+}
+
+fn expand_path(repo_dir_raw: &Path) -> PathBuf {
+    let cow = shellexpand::path::full(&repo_dir_raw).expect("Cannot resolve path");
+    cow.to_path_buf()
+}
+
 fn run(cli: &Cli) {
     match config::load_mend(cli) {
         Ok(merged_mend) => {
             match toml::to_string_pretty(&merged_mend) {
                 Ok(text) => {
                     println!("{}", text);
+                    drive(merged_mend)
                 }
                 Err(e) => {
                     eprintln!("{e}");

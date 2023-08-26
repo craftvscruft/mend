@@ -8,9 +8,12 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 clap = { version = "4.0.29", features = ["derive"] }
+common_failures = "0.1.1"
 indicatif = "0.17.6"
 serde = { version = "1.0.187", features = ["derive"] }
+shellexpand = { version = "3.1.0", features = ["path"] }
 toml = "0.7.6"
+which = "4.4.0"
 
 [dev-dependencies]
 insta = { version = "1.31.0", features = ["yaml"] }

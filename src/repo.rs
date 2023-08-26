@@ -1,28 +1,33 @@
-use std::path::Path;
+use std::error::Error;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use anyhow::Context;
+use which::which;
+use shellexpand;
 
-fn ensure_worktree(repo_dir: &Path, work_dir_relative : &str, sha : &str) {
+pub fn ensure_worktree(repo_dir: &Path, work_dir_relative : &str, sha : &str) -> PathBuf {
     let work_dir_joined = repo_dir.join(work_dir_relative);
+    eprintln!("Creating worktree at {} in repo at {}", work_dir_joined.to_str().unwrap(), repo_dir.to_str().unwrap());
+
+
+    let git_cmd = which("git").expect("Could resolve git command");
     if work_dir_joined.exists() {
-        let _ = Command::new("git")
-            .current_dir(repo_dir)
-            .arg("worktree")
-            .arg("remove")
-            .arg("--force")
-            .arg(work_dir_relative)
+        let _ = Command::new(&git_cmd)
+            .current_dir(&repo_dir)
+            .args(["worktree", "remove", "--force", work_dir_relative])
             .spawn();
     }
 
-    let _ = Command::new("git")
-        .current_dir(repo_dir)
-        .arg("worktree")
-        .arg("add")
-        .arg("--force")
-        .arg(work_dir_joined)
-        .arg(sha)
-        .spawn()
-        .expect("Could not created worktree");
+    let worktree_result = Command::new(&git_cmd)
+        .current_dir(&repo_dir)
+        .args(["worktree", "add", "--force", work_dir_relative, sha])
+        .output();
+    if let Err(e) = &worktree_result {
+        eprintln!("git_cmd {:?} {:?} {:?}", &git_cmd, &e, &e.cause());
+    }
+    // eprintln!("{:?}", worktree_result);
+    worktree_result.expect("Could not open worktree");
+    work_dir_joined
 }
 
 fn commit_all(repo_dir: &Path, message: &str) {

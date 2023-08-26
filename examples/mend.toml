@@ -1,4 +1,4 @@
-from = { sha = "43a3a253" }
+from = { repo = "~/dev/ioccc/endoh2", sha = "43a3a253" }
 include = [ "mend-recipes.toml" ]
 
 steps = [

@@ -4,6 +4,7 @@ expression: "loaded.expect(\"Failed loading\")"
 ---
 from:
   sha: 43a3a253
+  repo: ~/dev/ioccc/endoh2
 include: []
 env:
   DEFAULT_FILe: main.c
