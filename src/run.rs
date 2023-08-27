@@ -42,7 +42,7 @@ fn resolve_step_scripts(instruction: String, mend: &Mend) -> Vec<String> {
         }
     }
     resolved_instruction.push_str(&instruction);
-    resolved_instruction.push_str("\n");
+    resolved_instruction.push('\n');
 
     add_matching_hooks(&mut scripts, mend, "before_step", &recipe_tags);
     scripts.push(resolved_instruction);
@@ -78,7 +78,7 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
             .map({
                 |step| StepStatus {
                     run: step.to_string(),
-                    run_resolved: resolve_step_scripts(step.to_string(), &mend),
+                    run_resolved: resolve_step_scripts(step.to_string(), mend),
                     commit_msg: step.to_string(),
                     sha: None,
                     status: EStatus::Pending,
@@ -89,13 +89,13 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
     }
 }
 
-pub fn run_step(mut step_status: &mut StepStatus, cwd: &Path) {
+pub fn run_step(step_status: &mut StepStatus, cwd: &Path) {
     step_status.status = Running;
     let mut output_text = "".to_owned();
     let vec = &step_status.run_resolved;
     for script in vec {
         eprintln!("Running -------\n{}", script);
-        let output_result = run_script(cwd, &script);
+        let output_result = run_script(cwd, script);
         match output_result {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -107,7 +107,7 @@ pub fn run_step(mut step_status: &mut StepStatus, cwd: &Path) {
                     break;
                 }
             }
-            Err(e) => {
+            Err(_e) => {
                 step_status.status = Failed;
             }
         }
@@ -230,14 +230,14 @@ mod tests {
     }
 
     fn create_mend_with_steps(steps: Vec<String>) -> Mend {
-        let mend = Mend {
+        
+        Mend {
             from: None,
             include: vec![],
             env: Default::default(),
             recipes: Default::default(),
             hooks: Default::default(),
-            steps: steps,
-        };
-        mend
+            steps,
+        }
     }
 }

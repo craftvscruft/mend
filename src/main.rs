@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::repo::ensure_worktree;
 use crate::run::EStatus::Failed;
-use crate::run::{create_run_status_from_mend, run_step, StepStatus};
+use crate::run::{create_run_status_from_mend, run_step};
 use std::process::exit;
 
 mod config;
@@ -84,7 +84,7 @@ fn drive(mend: &Mend) {
                 worktree_dir.to_string_lossy()
             );
         }
-        let mut run_status = create_run_status_from_mend(&mend);
+        let run_status = create_run_status_from_mend(mend);
 
         for (key, value) in &mend.env {
             let expanded = shellexpand::env(value).unwrap();

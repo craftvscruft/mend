@@ -1,6 +1,6 @@
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 
-use std::error::Error;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use which::which;
@@ -45,13 +45,13 @@ fn run_command_with_output(
     cmd: String,
     args: Vec<&str>,
 ) -> anyhow::Result<Output> {
-    let cmd_path = which(cmd).with_context({ || "could not resolve" })?;
+    let cmd_path = which(cmd).with_context(|| "could not resolve")?;
     let child = Command::new(cmd_path)
         .current_dir(repo_dir)
         .args(args)
         .spawn()
-        .with_context({ || "" })?;
-    child.wait_with_output().with_context({ || "" })
+        .with_context(|| "")?;
+    child.wait_with_output().with_context(|| "")
 }
 
 fn commit_all(repo_dir: &Path, message: &str) -> anyhow::Result<()> {
