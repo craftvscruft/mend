@@ -103,7 +103,7 @@ fn drive(mend: &Mend) {
                 &worktree_dir,
                 &executor,
                 &notifier,
-                step_i.clone(),
+                step_i,
             );
             step_i += 1;
             if step_status.status == Failed {

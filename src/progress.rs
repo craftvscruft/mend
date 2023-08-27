@@ -80,7 +80,7 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
         pb.set_prefix(format!("[{}]{}", i + 1, i_padding));
         // pb.set_prefix(format!("[{}/{}]", i + 1, num_steps));
         notifier.progress_bars.push(pb);
-        notifier.notify(i.clone(), step_status, false);
+        notifier.notify(i, step_status, false);
         i += 1
     }
     notifier

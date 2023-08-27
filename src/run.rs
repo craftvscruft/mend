@@ -115,7 +115,7 @@ pub fn run_step<E: Executor, N: Notify>(
     let mut output_text = "".to_owned();
     let vec = &step_status.run_resolved;
     for script in vec {
-        notifier.notify(step_i.clone(), &step_status, true);
+        notifier.notify(step_i, step_status, true);
         let output_result = executor.run_script(cwd, script);
         match output_result {
             Ok(output) => {
@@ -125,22 +125,22 @@ pub fn run_step<E: Executor, N: Notify>(
                 output_text.push_str(stderr.as_ref());
                 if !output.status.success() {
                     step_status.status = Failed;
-                    notifier.notify(step_i.clone(), &step_status, false);
+                    notifier.notify(step_i, step_status, false);
                     break;
                 }
             }
             Err(_e) => {
                 step_status.status = Failed;
-                notifier.notify(step_i.clone(), &step_status, false);
+                notifier.notify(step_i, step_status, false);
             }
         }
     }
     step_status.output = Some(output_text);
     if step_status.status != Failed {
         step_status.status = Done;
-        notifier.notify(step_i.clone(), &step_status, true);
+        notifier.notify(step_i, step_status, true);
     } else {
-        notifier.notify(step_i.clone(), &step_status, false);
+        notifier.notify(step_i, step_status, false);
     }
 }
 
