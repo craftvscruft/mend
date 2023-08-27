@@ -1,11 +1,11 @@
-use anyhow::Context;
+use anyhow::{anyhow, bail, Context};
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 use which::which;
 
-pub fn ensure_worktree(repo_dir: &Path, work_dir_relative: &str, sha: &str) -> PathBuf {
+pub fn ensure_worktree(repo_dir: &Path, work_dir_relative: &str, sha: &str) -> anyhow::Result<PathBuf>  {
     let work_dir_joined = repo_dir.join(work_dir_relative);
     eprintln!(
         "Creating worktree at {} in repo at {}",
@@ -13,46 +13,58 @@ pub fn ensure_worktree(repo_dir: &Path, work_dir_relative: &str, sha: &str) -> P
         repo_dir.to_str().unwrap()
     );
 
-    let git_cmd = which("git").expect("Could resolve git command");
     if work_dir_joined.exists() {
-        let _ = Command::new(&git_cmd)
-            .current_dir(repo_dir)
-            .args(["worktree", "remove", "--force", work_dir_relative])
-            .spawn();
+        run_command_with_output(repo_dir, "git".to_string(), vec!["worktree", "remove", "--force", work_dir_relative])?;
     }
 
-    let worktree_result = Command::new(&git_cmd)
-        .current_dir(repo_dir)
-        .args(["worktree", "add", "--force", work_dir_relative, sha])
-        .output();
-    if let Err(e) = &worktree_result {
-        eprintln!("git_cmd {:?} {:?} {:?}", &git_cmd, &e, &e.source());
+    let output = run_command_with_output(repo_dir, "git".to_string(), vec!["worktree", "add", "--force", work_dir_relative, sha])?;
+    if !output.status.success() {
+        bail!("Failed to create worktree, output:\n{}{}",
+            String::from_utf8_lossy(&output.stdout).as_ref(),
+            String::from_utf8_lossy(&output.stderr).as_ref());
     }
-    // eprintln!("{:?}", worktree_result);
-    worktree_result.expect("Could not open worktree");
-    work_dir_joined
+    Ok(work_dir_joined)
 }
 
-fn commit_all(repo_dir: &Path, message: &str) {
-    let _ = Command::new("git")
+fn run_command_with_output(repo_dir: &Path, cmd: String, args: Vec<&str>) -> anyhow::Result<Output> {
+    let cmd_path = which(cmd).with_context({|| "could not resolve"})?;
+    let child = Command::new(cmd_path)
         .current_dir(repo_dir)
-        .arg("commit")
-        .arg("-am")
-        .arg(message)
+        .args(args)
         .spawn()
-        .expect("Could not commit");
+        .with_context({ || "" })?;
+    child
+        .wait_with_output()
+        .with_context({ || "" })
 }
 
-fn reset_hard(repo_dir: &Path) {
-    eprintln!("{}", String::from(repo_dir.to_str().unwrap()));
-    eprintln!("{}", repo_dir.exists());
-    eprintln!("{}", repo_dir.parent().unwrap().exists());
+fn commit_all(repo_dir: &Path, message: &str) -> anyhow::Result<()> {
+    let output = run_command_with_output(repo_dir, "git".to_string() , vec![
+        "commit",
+        "-am",
+        message
+    ])?;
+    if !output.status.success() {
+        bail!("Failed to commit, output:\n{}{}",
+            String::from_utf8_lossy(&output.stdout).as_ref(),
+            String::from_utf8_lossy(&output.stderr).as_ref());
+    } else {
+        Ok(())
+    }
+}
 
-    let _ = Command::new("git")
-        .current_dir(repo_dir)
-        .args(["reset", "--hard"])
-        .spawn()
-        .expect("Could not reset");
+fn reset_hard(repo_dir: &Path) -> anyhow::Result<()> {
+    let output = run_command_with_output(repo_dir, "git".to_string() , vec![
+        "reset",
+        "--hard"
+    ])?;
+    if !output.status.success() {
+        bail!("Failed to commit, output:\n{}{}",
+            String::from_utf8_lossy(&output.stdout).as_ref(),
+            String::from_utf8_lossy(&output.stderr).as_ref());
+    } else {
+        Ok(())
+    }
 }
 
 fn current_short_sha(repo_dir: &Path) -> anyhow::Result<String> {

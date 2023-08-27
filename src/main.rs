@@ -3,9 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
+use std::env;
 
 use crate::repo::ensure_worktree;
 use std::process::exit;
+use crate::run::{create_run_status_from_mend, run_step, StepStatus};
+use crate::run::EStatus::Failed;
 
 mod config;
 mod repo;
@@ -37,7 +40,7 @@ pub struct Mend {
     steps: Vec<String>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct From {
     sha: String,
     repo: String,
@@ -64,13 +67,33 @@ fn main() {
     run(&Cli::parse());
 }
 
-fn drive(mend: Mend) {
-    let from = mend.from.expect("No from declared in config");
+fn drive(mend: &Mend) {
+    let from = mend.from.as_ref().expect("No from declared in config").clone();
     // repo could be remote but for now assume a local checkout
     let repo_dir_raw = Path::new(&from.repo);
     // Multiple concurrent runs will stomp on each other. Choose unique dir?
     let repo_dir = expand_path(repo_dir_raw);
-    let _worktree_dir = ensure_worktree(repo_dir.as_path(), ".mend/worktree2", &from.sha);
+    if let Ok(worktree_dir) = ensure_worktree(repo_dir.as_path(), ".mend/worktree2", &from.sha) {
+        if !worktree_dir.exists() {
+            eprintln!("Worktree dir {} doesn't exist", worktree_dir.to_string_lossy());
+        }
+        let mut run_status = create_run_status_from_mend(&mend);
+
+        for (key, value) in &mend.env {
+            let expanded = shellexpand::env(value).unwrap();
+            env::set_var(key, expanded.as_ref());
+        }
+        for mut step_status in run_status.steps {
+            println!("Starting: {}", &step_status.run);
+            run_step(&mut step_status, &worktree_dir);
+
+            if step_status.status == Failed {
+                println!("{:?}", step_status);
+                break
+            }
+            println!("...Done")
+        }
+    }
 }
 
 fn expand_path(repo_dir_raw: &Path) -> PathBuf {
@@ -83,7 +106,7 @@ fn run(cli: &Cli) {
         Ok(merged_mend) => match toml::to_string_pretty(&merged_mend) {
             Ok(text) => {
                 println!("{}", text);
-                drive(merged_mend)
+                drive(&merged_mend)
             }
             Err(e) => {
                 eprintln!("{e}");

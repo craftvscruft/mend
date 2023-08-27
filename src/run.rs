@@ -1,20 +1,23 @@
 use crate::Mend;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug};
+use std::path::Path;
+use std::process::{Command, Output};
+use crate::run::EStatus::{Done, Failed, Running};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunStatus {
-    steps: Vec<StepStatus>,
+    pub steps: Vec<StepStatus>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct StepStatus {
-    run: String,
-    run_resolved: Vec<String>,
-    commit_msg: String,
-    sha: Option<String>,
-    status: EStatus,
-    output: Option<String>
+    pub run: String,
+    pub run_resolved: Vec<String>,
+    pub commit_msg: String,
+    pub sha: Option<String>,
+    pub status: EStatus,
+    pub output: Option<String>
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -28,7 +31,7 @@ fn resolve_step_scripts(instruction: String, mend: &Mend) -> Vec<String> {
     let mut recipe_tags : Vec<String> = vec![];
     for (recipe_name, recipe) in &mend.recipes {
         if instruction.contains(recipe_name.as_str()) {
-            let recipe_fn = format!("function {} () {{\n{}\n}}\n", recipe_name, recipe.run);
+            let recipe_fn = format!("function {}() {{\n{}\n}}\n", recipe_name, recipe.run);
             resolved_instruction.push_str(&recipe_fn);
             for tag in &recipe.tags {
                 recipe_tags.push(tag.to_string())
@@ -66,7 +69,7 @@ fn add_matching_hooks(scripts: &mut Vec<String>, mend: &Mend, key: &str, tags: &
     }
 }
 
-fn create_run_status_from_mend(mend: Mend) -> RunStatus {
+pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
     RunStatus {
         steps: mend.steps.iter().map({|step |
             StepStatus {
@@ -81,16 +84,55 @@ fn create_run_status_from_mend(mend: Mend) -> RunStatus {
     }
 }
 
+
+pub fn run_step(mut step_status: &mut StepStatus, cwd: &Path) {
+    step_status.status = Running;
+    let mut output_text = "".to_owned();
+    let vec = &step_status.run_resolved;
+    for script in vec {
+        eprintln!("Running -------\n{}", script);
+        let output_result = run_script(cwd, &script);
+        match output_result {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                output_text.push_str(stdout.as_ref());
+                output_text.push_str(stderr.as_ref());
+                if !output.status.success() {
+                    step_status.status = Failed;
+                    break;
+                }
+            }
+            Err(e) => {
+                step_status.status = Failed;
+            }
+        }
+    }
+    step_status.output = Some(output_text);
+    if step_status.status != Failed {
+        step_status.status = Done
+    }
+}
+
+fn run_script(cwd: &Path, script: &str) -> std::io::Result<Output> {
+    Command::new("sh")
+        .current_dir(cwd)
+        .arg("-c")
+        .arg(script)
+        .spawn()
+        .expect("couldn't start sh")
+        .wait_with_output()
+}
+
 #[cfg(test)]
 mod tests {
-    use std::os::macos::raw::stat;
     use crate::{Hook, Mend, Recipe};
     use crate::run::create_run_status_from_mend;
 
     #[test]
     fn test_create_run_status_empty() {
         let mend = create_mend_with_steps(vec![]);
-        insta::assert_yaml_snapshot!(create_run_status_from_mend(mend));
+        insta::assert_yaml_snapshot!(create_run_status_from_mend(&mend));
     }
 
     #[test]
@@ -98,7 +140,7 @@ mod tests {
         let mend = create_mend_with_steps(vec![
             "cmd arg1 arg2".to_string()
         ]);
-        let status = create_run_status_from_mend(mend);
+        let status = create_run_status_from_mend(&mend);
         assert_eq!(status.steps.len(), 1);
         insta::assert_yaml_snapshot!(status);
     }
@@ -121,7 +163,7 @@ mod tests {
             tag: None,
             tags: vec![],
         });
-        let status = create_run_status_from_mend(mend);
+        let status = create_run_status_from_mend(&mend);
         assert_eq!(status.steps.len(), 1);
         insta::assert_yaml_snapshot!(status);
     }
@@ -144,7 +186,7 @@ mod tests {
         };
         mend.hooks.insert("before_step".to_string(), vec![before_step_hook]);
         mend.hooks.insert("after_step".to_string(), vec![after_step_hook]);
-        let status = create_run_status_from_mend(mend);
+        let status = create_run_status_from_mend(&mend);
         assert_eq!(status.steps.len(), 1);
         insta::assert_yaml_snapshot!(status);
     }
@@ -172,7 +214,7 @@ mod tests {
             tag: None,
             tags: vec!["some_tag".to_string()],
         });
-        let status = create_run_status_from_mend(mend);
+        let status = create_run_status_from_mend(&mend);
         assert_eq!(status.steps.len(), 1);
         insta::assert_yaml_snapshot!(status);
     }
