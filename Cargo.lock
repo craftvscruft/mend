@@ -352,6 +352,7 @@ dependencies = [
  "anyhow",
  "clap",
  "common_failures",
+ "console",
  "indicatif",
  "insta",
  "serde",

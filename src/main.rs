@@ -9,10 +9,12 @@ use crate::repo::ensure_worktree;
 use crate::run::EStatus::Failed;
 use crate::run::{create_run_status_from_mend, run_step};
 use std::process::exit;
+use crate::progress::{create_console_notifier, Notify};
 
 mod config;
 mod repo;
 mod run;
+mod progress;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -73,10 +75,13 @@ fn drive(mend: &Mend) {
         .as_ref()
         .expect("No from declared in config")
         .clone();
+    let run_status = create_run_status_from_mend(mend);
+    let notifier = create_console_notifier(&run_status);
     // repo could be remote but for now assume a local checkout
     let repo_dir_raw = Path::new(&from.repo);
     // Multiple concurrent runs will stomp on each other. Choose unique dir?
     let repo_dir = expand_path(repo_dir_raw);
+
     if let Ok(worktree_dir) = ensure_worktree(repo_dir.as_path(), ".mend/worktree2", &from.sha) {
         if !worktree_dir.exists() {
             eprintln!(
@@ -84,22 +89,23 @@ fn drive(mend: &Mend) {
                 worktree_dir.to_string_lossy()
             );
         }
-        let run_status = create_run_status_from_mend(mend);
 
         for (key, value) in &mend.env {
             let expanded = shellexpand::env(value).unwrap();
             env::set_var(key, expanded.as_ref());
         }
+        let mut step_i : usize = 0;
         for mut step_status in run_status.steps {
-            println!("Starting: {}", &step_status.run);
-            run_step(&mut step_status, &worktree_dir);
-
+            // println!("Starting: {}", &step_status.run);
+            run_step(&mut step_status, &worktree_dir, &notifier, step_i.clone());
+            step_i += 1;
             if step_status.status == Failed {
                 println!("{:?}", step_status);
                 break;
             }
-            println!("...Done")
+            // println!("...Done")
         }
+        notifier.notify_done()
     }
 }
 

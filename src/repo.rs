@@ -1,9 +1,7 @@
 use anyhow::{bail, Context};
-
-
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use which::which;
+use std::process::Command;
+use crate::run::run_command_with_output;
 
 pub fn ensure_worktree(
     repo_dir: &Path,
@@ -38,20 +36,6 @@ pub fn ensure_worktree(
         );
     }
     Ok(work_dir_joined)
-}
-
-fn run_command_with_output(
-    repo_dir: &Path,
-    cmd: String,
-    args: Vec<&str>,
-) -> anyhow::Result<Output> {
-    let cmd_path = which(cmd).with_context(|| "could not resolve")?;
-    let child = Command::new(cmd_path)
-        .current_dir(repo_dir)
-        .args(args)
-        .spawn()
-        .with_context(|| "")?;
-    child.wait_with_output().with_context(|| "")
 }
 
 fn commit_all(repo_dir: &Path, message: &str) -> anyhow::Result<()> {

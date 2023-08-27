@@ -3,7 +3,10 @@ use crate::Mend;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::Path;
+use which::which;
+use anyhow::Context;
 use std::process::{Command, Output};
+use crate::progress::{ConsoleNotifier, Notify};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunStatus {
@@ -89,12 +92,18 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
     }
 }
 
-pub fn run_step(step_status: &mut StepStatus, cwd: &Path) {
+pub fn run_step(step_status: &mut StepStatus, cwd: &Path, notifier: &ConsoleNotifier, step_i: usize) {
     step_status.status = Running;
     let mut output_text = "".to_owned();
     let vec = &step_status.run_resolved;
     for script in vec {
-        eprintln!("Running -------\n{}", script);
+        // eprintln!("Running -------\n{}", script);
+        let one_line_script = match script.trim_end().rsplit_once('\n') {
+            Some((_, last_line)) => { last_line}
+            None => {script}
+        };
+        notifier.notify(step_i.clone(), &step_status.status, format!("Running {}", one_line_script), true);
+
         let output_result = run_script(cwd, script);
         match output_result {
             Ok(output) => {
@@ -104,29 +113,43 @@ pub fn run_step(step_status: &mut StepStatus, cwd: &Path) {
                 output_text.push_str(stderr.as_ref());
                 if !output.status.success() {
                     step_status.status = Failed;
+                    notifier.notify(step_i.clone(), &step_status.status, "Failed".to_string(), false);
                     break;
                 }
             }
             Err(_e) => {
                 step_status.status = Failed;
+                notifier.notify(step_i.clone(), &step_status.status, "Failed".to_string(), false);
             }
         }
     }
     step_status.output = Some(output_text);
     if step_status.status != Failed {
-        step_status.status = Done
+        step_status.status = Done;
+        notifier.notify(step_i.clone(), &step_status.status, "Done".to_string(), false);
+    } else {
+        notifier.notify(step_i.clone(), &step_status.status, "Failed".to_string(), false);
     }
 }
 
-fn run_script(cwd: &Path, script: &str) -> std::io::Result<Output> {
-    Command::new("sh")
-        .current_dir(cwd)
-        .arg("-c")
-        .arg(script)
-        .spawn()
-        .expect("couldn't start sh")
-        .wait_with_output()
+fn run_script(cwd: &Path, script: &str) -> anyhow::Result<Output> {
+    run_command_with_output(cwd, "sh".to_string(), vec!["-c", script])
 }
+
+pub fn run_command_with_output(
+    repo_dir: &Path,
+    cmd: String,
+    args: Vec<&str>,
+) -> anyhow::Result<Output> {
+    let cmd_path = which(&cmd).with_context(|| "could not resolve")?;
+    Command::new(&cmd_path)
+        .current_dir(repo_dir)
+        .args(args)
+        .output()
+        .with_context(|| format!("Could not run command {}, resolved {:?}", cmd, cmd_path))
+}
+
+
 
 #[cfg(test)]
 mod tests {
