@@ -6,7 +6,7 @@ use std::path::Path;
 use which::which;
 use anyhow::Context;
 use std::process::{Command, Output};
-use crate::progress::{ConsoleNotifier, Notify};
+use crate::progress::Notify;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunStatus {
@@ -53,6 +53,21 @@ fn resolve_step_scripts(instruction: String, mend: &Mend) -> Vec<String> {
     scripts
 }
 
+pub trait Executor {
+    fn run_script(&self, cwd: &Path, script: &str) -> anyhow::Result<Output>;
+}
+
+pub struct ShellExecutor {
+}
+
+impl Executor for ShellExecutor {
+    fn run_script(&self, cwd: &Path, script: &str) -> anyhow::Result<Output> {
+        run_command_with_output(cwd, "sh".to_string(), vec!["-c", script])
+    }
+}
+
+
+
 fn add_matching_hooks(scripts: &mut Vec<String>, mend: &Mend, key: &str, tags: &Vec<String>) {
     if let Some(hooks) = mend.hooks.get(key) {
         for hook in hooks {
@@ -92,14 +107,13 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
     }
 }
 
-pub fn run_step(step_status: &mut StepStatus, cwd: &Path, notifier: &ConsoleNotifier, step_i: usize) {
+pub fn run_step<E: Executor, N: Notify>(step_status: &mut StepStatus, cwd: &Path, executor: &E, notifier: &N, step_i: usize) {
     step_status.status = Running;
     let mut output_text = "".to_owned();
     let vec = &step_status.run_resolved;
     for script in vec {
         notifier.notify(step_i.clone(), &step_status, true);
-
-        let output_result = run_script(cwd, script);
+        let output_result = executor.run_script(cwd, script);
         match output_result {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -127,9 +141,6 @@ pub fn run_step(step_status: &mut StepStatus, cwd: &Path, notifier: &ConsoleNoti
     }
 }
 
-fn run_script(cwd: &Path, script: &str) -> anyhow::Result<Output> {
-    run_command_with_output(cwd, "sh".to_string(), vec!["-c", script])
-}
 
 pub fn run_command_with_output(
     repo_dir: &Path,
