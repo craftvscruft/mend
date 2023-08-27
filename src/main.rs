@@ -1,14 +1,14 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::env;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
-use std::env;
 
 use crate::repo::ensure_worktree;
-use std::process::exit;
-use crate::run::{create_run_status_from_mend, run_step, StepStatus};
 use crate::run::EStatus::Failed;
+use crate::run::{create_run_status_from_mend, run_step, StepStatus};
+use std::process::exit;
 
 mod config;
 mod repo;
@@ -68,14 +68,21 @@ fn main() {
 }
 
 fn drive(mend: &Mend) {
-    let from = mend.from.as_ref().expect("No from declared in config").clone();
+    let from = mend
+        .from
+        .as_ref()
+        .expect("No from declared in config")
+        .clone();
     // repo could be remote but for now assume a local checkout
     let repo_dir_raw = Path::new(&from.repo);
     // Multiple concurrent runs will stomp on each other. Choose unique dir?
     let repo_dir = expand_path(repo_dir_raw);
     if let Ok(worktree_dir) = ensure_worktree(repo_dir.as_path(), ".mend/worktree2", &from.sha) {
         if !worktree_dir.exists() {
-            eprintln!("Worktree dir {} doesn't exist", worktree_dir.to_string_lossy());
+            eprintln!(
+                "Worktree dir {} doesn't exist",
+                worktree_dir.to_string_lossy()
+            );
         }
         let mut run_status = create_run_status_from_mend(&mend);
 
@@ -89,7 +96,7 @@ fn drive(mend: &Mend) {
 
             if step_status.status == Failed {
                 println!("{:?}", step_status);
-                break
+                break;
             }
             println!("...Done")
         }

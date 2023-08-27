@@ -5,7 +5,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use which::which;
 
-pub fn ensure_worktree(repo_dir: &Path, work_dir_relative: &str, sha: &str) -> anyhow::Result<PathBuf>  {
+pub fn ensure_worktree(
+    repo_dir: &Path,
+    work_dir_relative: &str,
+    sha: &str,
+) -> anyhow::Result<PathBuf> {
     let work_dir_joined = repo_dir.join(work_dir_relative);
     eprintln!(
         "Creating worktree at {} in repo at {}",
@@ -14,54 +18,64 @@ pub fn ensure_worktree(repo_dir: &Path, work_dir_relative: &str, sha: &str) -> a
     );
 
     if work_dir_joined.exists() {
-        run_command_with_output(repo_dir, "git".to_string(), vec!["worktree", "remove", "--force", work_dir_relative])?;
+        run_command_with_output(
+            repo_dir,
+            "git".to_string(),
+            vec!["worktree", "remove", "--force", work_dir_relative],
+        )?;
     }
 
-    let output = run_command_with_output(repo_dir, "git".to_string(), vec!["worktree", "add", "--force", work_dir_relative, sha])?;
+    let output = run_command_with_output(
+        repo_dir,
+        "git".to_string(),
+        vec!["worktree", "add", "--force", work_dir_relative, sha],
+    )?;
     if !output.status.success() {
-        bail!("Failed to create worktree, output:\n{}{}",
+        bail!(
+            "Failed to create worktree, output:\n{}{}",
             String::from_utf8_lossy(&output.stdout).as_ref(),
-            String::from_utf8_lossy(&output.stderr).as_ref());
+            String::from_utf8_lossy(&output.stderr).as_ref()
+        );
     }
     Ok(work_dir_joined)
 }
 
-fn run_command_with_output(repo_dir: &Path, cmd: String, args: Vec<&str>) -> anyhow::Result<Output> {
-    let cmd_path = which(cmd).with_context({|| "could not resolve"})?;
+fn run_command_with_output(
+    repo_dir: &Path,
+    cmd: String,
+    args: Vec<&str>,
+) -> anyhow::Result<Output> {
+    let cmd_path = which(cmd).with_context({ || "could not resolve" })?;
     let child = Command::new(cmd_path)
         .current_dir(repo_dir)
         .args(args)
         .spawn()
         .with_context({ || "" })?;
-    child
-        .wait_with_output()
-        .with_context({ || "" })
+    child.wait_with_output().with_context({ || "" })
 }
 
 fn commit_all(repo_dir: &Path, message: &str) -> anyhow::Result<()> {
-    let output = run_command_with_output(repo_dir, "git".to_string() , vec![
-        "commit",
-        "-am",
-        message
-    ])?;
+    let output =
+        run_command_with_output(repo_dir, "git".to_string(), vec!["commit", "-am", message])?;
     if !output.status.success() {
-        bail!("Failed to commit, output:\n{}{}",
+        bail!(
+            "Failed to commit, output:\n{}{}",
             String::from_utf8_lossy(&output.stdout).as_ref(),
-            String::from_utf8_lossy(&output.stderr).as_ref());
+            String::from_utf8_lossy(&output.stderr).as_ref()
+        );
     } else {
         Ok(())
     }
 }
 
 fn reset_hard(repo_dir: &Path) -> anyhow::Result<()> {
-    let output = run_command_with_output(repo_dir, "git".to_string() , vec![
-        "reset",
-        "--hard"
-    ])?;
+    let output = run_command_with_output(repo_dir, "git".to_string(), vec!["reset", "--hard"])?;
     if !output.status.success() {
-        bail!("Failed to commit, output:\n{}{}",
+        bail!(
+            "Failed to commit, output:\n{}{}",
             String::from_utf8_lossy(&output.stdout).as_ref(),
-            String::from_utf8_lossy(&output.stderr).as_ref());
+            String::from_utf8_lossy(&output.stderr).as_ref()
+        );
     } else {
         Ok(())
     }

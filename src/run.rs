@@ -1,9 +1,9 @@
+use crate::run::EStatus::{Done, Failed, Running};
 use crate::Mend;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug};
+use std::fmt::Debug;
 use std::path::Path;
 use std::process::{Command, Output};
-use crate::run::EStatus::{Done, Failed, Running};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunStatus {
@@ -17,18 +17,21 @@ pub struct StepStatus {
     pub commit_msg: String,
     pub sha: Option<String>,
     pub status: EStatus,
-    pub output: Option<String>
+    pub output: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum EStatus {
-    Pending, Running, Done, Failed
+    Pending,
+    Running,
+    Done,
+    Failed,
 }
 
 fn resolve_step_scripts(instruction: String, mend: &Mend) -> Vec<String> {
     let mut resolved_instruction = "".to_owned();
     let mut scripts = vec![];
-    let mut recipe_tags : Vec<String> = vec![];
+    let mut recipe_tags: Vec<String> = vec![];
     for (recipe_name, recipe) in &mend.recipes {
         if instruction.contains(recipe_name.as_str()) {
             let recipe_fn = format!("function {}() {{\n{}\n}}\n", recipe_name, recipe.run);
@@ -41,13 +44,11 @@ fn resolve_step_scripts(instruction: String, mend: &Mend) -> Vec<String> {
     resolved_instruction.push_str(&instruction);
     resolved_instruction.push_str("\n");
 
-    add_matching_hooks( &mut scripts, mend, "before_step", &recipe_tags);
+    add_matching_hooks(&mut scripts, mend, "before_step", &recipe_tags);
     scripts.push(resolved_instruction);
-    add_matching_hooks( &mut scripts, mend, "after_step", &recipe_tags);
+    add_matching_hooks(&mut scripts, mend, "after_step", &recipe_tags);
     scripts
 }
-
-
 
 fn add_matching_hooks(scripts: &mut Vec<String>, mend: &Mend, key: &str, tags: &Vec<String>) {
     if let Some(hooks) = mend.hooks.get(key) {
@@ -71,19 +72,22 @@ fn add_matching_hooks(scripts: &mut Vec<String>, mend: &Mend, key: &str, tags: &
 
 pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
     RunStatus {
-        steps: mend.steps.iter().map({|step |
-            StepStatus {
-                run: step.to_string(),
-                run_resolved: resolve_step_scripts(step.to_string(), &mend),
-                commit_msg: step.to_string(),
-                sha: None,
-                status: EStatus::Pending,
-                output: None,
-            }
-        }).collect()
+        steps: mend
+            .steps
+            .iter()
+            .map({
+                |step| StepStatus {
+                    run: step.to_string(),
+                    run_resolved: resolve_step_scripts(step.to_string(), &mend),
+                    commit_msg: step.to_string(),
+                    sha: None,
+                    status: EStatus::Pending,
+                    output: None,
+                }
+            })
+            .collect(),
     }
 }
-
 
 pub fn run_step(mut step_status: &mut StepStatus, cwd: &Path) {
     step_status.status = Running;
@@ -126,8 +130,8 @@ fn run_script(cwd: &Path, script: &str) -> std::io::Result<Output> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Hook, Mend, Recipe};
     use crate::run::create_run_status_from_mend;
+    use crate::{Hook, Mend, Recipe};
 
     #[test]
     fn test_create_run_status_empty() {
@@ -137,9 +141,7 @@ mod tests {
 
     #[test]
     fn test_create_run_status_one_step() {
-        let mend = create_mend_with_steps(vec![
-            "cmd arg1 arg2".to_string()
-        ]);
+        let mend = create_mend_with_steps(vec!["cmd arg1 arg2".to_string()]);
         let status = create_run_status_from_mend(&mend);
         assert_eq!(status.steps.len(), 1);
         insta::assert_yaml_snapshot!(status);
@@ -147,22 +149,26 @@ mod tests {
 
     #[test]
     fn test_create_run_status_resolve_recipe() {
-        let mut mend = create_mend_with_steps(vec![
-            "cmd arg1 arg2".to_string()
-        ]);
+        let mut mend = create_mend_with_steps(vec!["cmd arg1 arg2".to_string()]);
 
-        mend.recipes.insert("cmd".to_string(), Recipe {
-            run: "resolved $1 $2".to_string(),
-            commit_template: None,
-            tag: None,
-            tags: vec![],
-        });
-        mend.recipes.insert("not_used".to_string(), Recipe {
-            run: "should not appear!".to_string(),
-            commit_template: None,
-            tag: None,
-            tags: vec![],
-        });
+        mend.recipes.insert(
+            "cmd".to_string(),
+            Recipe {
+                run: "resolved $1 $2".to_string(),
+                commit_template: None,
+                tag: None,
+                tags: vec![],
+            },
+        );
+        mend.recipes.insert(
+            "not_used".to_string(),
+            Recipe {
+                run: "should not appear!".to_string(),
+                commit_template: None,
+                tag: None,
+                tags: vec![],
+            },
+        );
         let status = create_run_status_from_mend(&mend);
         assert_eq!(status.steps.len(), 1);
         insta::assert_yaml_snapshot!(status);
@@ -170,22 +176,22 @@ mod tests {
 
     #[test]
     fn test_create_run_status_include_hooks() {
-        let mut mend = create_mend_with_steps(vec![
-            "cmd arg1 arg2".to_string()
-        ]);
+        let mut mend = create_mend_with_steps(vec!["cmd arg1 arg2".to_string()]);
 
         let before_step_hook = Hook {
             run: Option::from("echo Hello before".to_string()),
             when_tag: None,
-            when_not_tag: None
+            when_not_tag: None,
         };
         let after_step_hook = Hook {
             run: Option::from("echo Hello after".to_string()),
             when_tag: None,
-            when_not_tag: None
+            when_not_tag: None,
         };
-        mend.hooks.insert("before_step".to_string(), vec![before_step_hook]);
-        mend.hooks.insert("after_step".to_string(), vec![after_step_hook]);
+        mend.hooks
+            .insert("before_step".to_string(), vec![before_step_hook]);
+        mend.hooks
+            .insert("after_step".to_string(), vec![after_step_hook]);
         let status = create_run_status_from_mend(&mend);
         assert_eq!(status.steps.len(), 1);
         insta::assert_yaml_snapshot!(status);
@@ -193,27 +199,31 @@ mod tests {
 
     #[test]
     fn test_create_run_status_include_hooks_matching_on_tag() {
-        let mut mend = create_mend_with_steps(vec![
-            "cmd arg1 arg2".to_string()
-        ]);
+        let mut mend = create_mend_with_steps(vec!["cmd arg1 arg2".to_string()]);
 
         let before_hook_tag = Hook {
             run: Option::from("echo Hello before some_tag".to_string()),
             when_tag: Some("some_tag".to_string()),
-            when_not_tag: None
+            when_not_tag: None,
         };
         let before_hook_not_tag = Hook {
             run: Some("echo Hello from before NOT some_tag".to_string()),
             when_tag: None,
-            when_not_tag: Some("some_tag".to_string())
+            when_not_tag: Some("some_tag".to_string()),
         };
-        mend.hooks.insert("before_step".to_string(), vec![before_hook_tag, before_hook_not_tag]);
-        mend.recipes.insert("cmd".to_string(), Recipe {
-            run: "resolved $1 $2".to_string(),
-            commit_template: None,
-            tag: None,
-            tags: vec!["some_tag".to_string()],
-        });
+        mend.hooks.insert(
+            "before_step".to_string(),
+            vec![before_hook_tag, before_hook_not_tag],
+        );
+        mend.recipes.insert(
+            "cmd".to_string(),
+            Recipe {
+                run: "resolved $1 $2".to_string(),
+                commit_template: None,
+                tag: None,
+                tags: vec!["some_tag".to_string()],
+            },
+        );
         let status = create_run_status_from_mend(&mend);
         assert_eq!(status.steps.len(), 1);
         insta::assert_yaml_snapshot!(status);
