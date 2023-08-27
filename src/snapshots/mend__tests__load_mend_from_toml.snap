@@ -48,17 +48,19 @@ recipes:
       - binary_identical
 hooks:
   after_step:
-    run: ~
-    run_for_tag:
-      tag: binary_identical
-      run: diff a.out a.out.bak
-      else_run: make test
+    - run: diff a.out a.out.bak
+      when_tag: binary_identical
+      when_not_tag: ~
+    - run: make test
+      when_tag: ~
+      when_not_tag: binary_identical
   before_step:
-    run: ~
-    run_for_tag:
-      tag: binary_identical
-      run: make && cp a.out a.bak
-      else_run: make
+    - run: make && cp a.out a.bak
+      when_tag: binary_identical
+      when_not_tag: ~
+    - run: make
+      when_tag: ~
+      when_not_tag: binary_identical
 steps:
   - remove_comments_in_includes
   - remove_comments

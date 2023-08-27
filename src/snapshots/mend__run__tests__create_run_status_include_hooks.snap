@@ -4,7 +4,10 @@ expression: status
 ---
 steps:
   - run: cmd arg1 arg2
-    run_resolved: "echo Hello before\ncmd arg1 arg2\necho Hello after\n"
+    run_resolved:
+      - echo Hello before
+      - "cmd arg1 arg2\n"
+      - echo Hello after
     commit_msg: cmd arg1 arg2
     sha: ~
     status: Pending

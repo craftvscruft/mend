@@ -31,7 +31,7 @@ pub struct Mend {
     recipes: BTreeMap<String, Recipe>,
 
     #[serde(default)]
-    hooks: BTreeMap<String, Hook>,
+    hooks: BTreeMap<String, Vec<Hook>>,
 
     #[serde(default)]
     steps: Vec<String>,
@@ -56,14 +56,8 @@ pub struct Recipe {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Hook {
     run: Option<String>,
-    run_for_tag: Option<HookRunForTag>,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct HookRunForTag {
-    tag: String,
-    run: String,
-    else_run: Option<String>,
+    when_tag: Option<String>,
+    when_not_tag: Option<String>,
 }
 
 fn main() {
@@ -121,7 +115,7 @@ mod tests {
     use crate::Cli;
 
     #[test]
-    fn it_works() {
+    fn load_mend_from_toml() {
         let mut toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         toml_path.push("examples/mend.toml");
         let args = Cli {

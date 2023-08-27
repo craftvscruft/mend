@@ -26,7 +26,7 @@ pub fn ensure_worktree(repo_dir: &Path, work_dir_relative: &str, sha: &str) -> P
         .args(["worktree", "add", "--force", work_dir_relative, sha])
         .output();
     if let Err(e) = &worktree_result {
-        eprintln!("git_cmd {:?} {:?} {:?}", &git_cmd, &e, &e.cause());
+        eprintln!("git_cmd {:?} {:?} {:?}", &git_cmd, &e, &e.source());
     }
     // eprintln!("{:?}", worktree_result);
     worktree_result.expect("Could not open worktree");

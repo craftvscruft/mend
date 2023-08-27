@@ -22,12 +22,18 @@ DEFAULT_FILe = "main.c"
 JAVA_HOME = "/Library/Java/JavaVirtualMachines/graalvm-jdk-20.0.2+9.1/Contents/Home/"
 PATH = "$PATH:/Users/rmyers/dev/untangler/build/install/untangler/bin"
 
-[hooks.before_step.run_for_tag]
-tag = "binary_identical"
+[[hooks.before_step]]
+when_tag = "binary_identical"
 run = "make && cp a.out a.bak"
-else_run = "make"
 
-[hooks.after_step.run_for_tag]
-tag = "binary_identical"
+[[hooks.before_step]]
+when_not_tag = "binary_identical"
+run = "make"
+
+[[hooks.after_step]]
+when_tag = "binary_identical"
 run = "diff a.out a.out.bak"
-else_run = "make test"
+
+[[hooks.after_step]]
+when_not_tag = "binary_identical"
+run = "make test"
