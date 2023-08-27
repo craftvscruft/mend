@@ -1,12 +1,12 @@
+use crate::progress::Notify;
 use crate::run::EStatus::{Done, Failed, Running};
 use crate::Mend;
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::Path;
-use which::which;
-use anyhow::Context;
 use std::process::{Command, Output};
-use crate::progress::Notify;
+use which::which;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunStatus {
@@ -57,16 +57,13 @@ pub trait Executor {
     fn run_script(&self, cwd: &Path, script: &str) -> anyhow::Result<Output>;
 }
 
-pub struct ShellExecutor {
-}
+pub struct ShellExecutor {}
 
 impl Executor for ShellExecutor {
     fn run_script(&self, cwd: &Path, script: &str) -> anyhow::Result<Output> {
         run_command_with_output(cwd, "sh".to_string(), vec!["-c", script])
     }
 }
-
-
 
 fn add_matching_hooks(scripts: &mut Vec<String>, mend: &Mend, key: &str, tags: &Vec<String>) {
     if let Some(hooks) = mend.hooks.get(key) {
@@ -107,7 +104,13 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
     }
 }
 
-pub fn run_step<E: Executor, N: Notify>(step_status: &mut StepStatus, cwd: &Path, executor: &E, notifier: &N, step_i: usize) {
+pub fn run_step<E: Executor, N: Notify>(
+    step_status: &mut StepStatus,
+    cwd: &Path,
+    executor: &E,
+    notifier: &N,
+    step_i: usize,
+) {
     step_status.status = Running;
     let mut output_text = "".to_owned();
     let vec = &step_status.run_resolved;
@@ -135,12 +138,11 @@ pub fn run_step<E: Executor, N: Notify>(step_status: &mut StepStatus, cwd: &Path
     step_status.output = Some(output_text);
     if step_status.status != Failed {
         step_status.status = Done;
-        notifier.notify(step_i.clone(), &step_status,  true);
+        notifier.notify(step_i.clone(), &step_status, true);
     } else {
         notifier.notify(step_i.clone(), &step_status, false);
     }
 }
-
 
 pub fn run_command_with_output(
     repo_dir: &Path,
@@ -154,8 +156,6 @@ pub fn run_command_with_output(
         .output()
         .with_context(|| format!("Could not run command {}, resolved {:?}", cmd, cmd_path))
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -259,7 +259,6 @@ mod tests {
     }
 
     fn create_mend_with_steps(steps: Vec<String>) -> Mend {
-        
         Mend {
             from: None,
             include: vec![],

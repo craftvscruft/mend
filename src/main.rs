@@ -5,16 +5,16 @@ use std::env;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
+use crate::progress::{create_console_notifier, Notify};
 use crate::repo::ensure_worktree;
 use crate::run::EStatus::Failed;
 use crate::run::{create_run_status_from_mend, run_step, ShellExecutor};
 use std::process::exit;
-use crate::progress::{create_console_notifier, Notify};
 
 mod config;
+mod progress;
 mod repo;
 mod run;
-mod progress;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -94,11 +94,17 @@ fn drive(mend: &Mend) {
             let expanded = shellexpand::env(value).unwrap();
             env::set_var(key, expanded.as_ref());
         }
-        let mut step_i : usize = 0;
+        let mut step_i: usize = 0;
         let executor = ShellExecutor {};
         for mut step_status in run_status.steps {
             // println!("Starting: {}", &step_status.run);
-            run_step(&mut step_status, &worktree_dir, &executor, &notifier, step_i.clone());
+            run_step(
+                &mut step_status,
+                &worktree_dir,
+                &executor,
+                &notifier,
+                step_i.clone(),
+            );
             step_i += 1;
             if step_status.status == Failed {
                 println!("{:?}", step_status);

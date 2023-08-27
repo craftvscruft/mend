@@ -1,7 +1,7 @@
+use crate::run::run_command_with_output;
 use anyhow::{bail, Context};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use crate::run::run_command_with_output;
 
 pub fn ensure_worktree(
     repo_dir: &Path,
