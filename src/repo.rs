@@ -9,11 +9,11 @@ pub fn ensure_worktree(
     sha: &str,
 ) -> anyhow::Result<PathBuf> {
     let work_dir_joined = repo_dir.join(work_dir_relative);
-    eprintln!(
-        "Creating worktree at {} in repo at {}",
-        work_dir_joined.to_str().unwrap(),
-        repo_dir.to_str().unwrap()
-    );
+    // eprintln!(
+    //     "Creating worktree at {} in repo at {}",
+    //     work_dir_joined.to_str().unwrap(),
+    //     repo_dir.to_str().unwrap()
+    // );
 
     if work_dir_joined.exists() {
         run_command_with_output(

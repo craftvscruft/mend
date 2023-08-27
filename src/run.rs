@@ -97,12 +97,7 @@ pub fn run_step(step_status: &mut StepStatus, cwd: &Path, notifier: &ConsoleNoti
     let mut output_text = "".to_owned();
     let vec = &step_status.run_resolved;
     for script in vec {
-        // eprintln!("Running -------\n{}", script);
-        let one_line_script = match script.trim_end().rsplit_once('\n') {
-            Some((_, last_line)) => { last_line}
-            None => {script}
-        };
-        notifier.notify(step_i.clone(), &step_status.status, format!("Running {}", one_line_script), true);
+        notifier.notify(step_i.clone(), &step_status, true);
 
         let output_result = run_script(cwd, script);
         match output_result {
@@ -113,22 +108,22 @@ pub fn run_step(step_status: &mut StepStatus, cwd: &Path, notifier: &ConsoleNoti
                 output_text.push_str(stderr.as_ref());
                 if !output.status.success() {
                     step_status.status = Failed;
-                    notifier.notify(step_i.clone(), &step_status.status, "Failed".to_string(), false);
+                    notifier.notify(step_i.clone(), &step_status, false);
                     break;
                 }
             }
             Err(_e) => {
                 step_status.status = Failed;
-                notifier.notify(step_i.clone(), &step_status.status, "Failed".to_string(), false);
+                notifier.notify(step_i.clone(), &step_status, false);
             }
         }
     }
     step_status.output = Some(output_text);
     if step_status.status != Failed {
         step_status.status = Done;
-        notifier.notify(step_i.clone(), &step_status.status, "Done".to_string(), false);
+        notifier.notify(step_i.clone(), &step_status,  true);
     } else {
-        notifier.notify(step_i.clone(), &step_status.status, "Failed".to_string(), false);
+        notifier.notify(step_i.clone(), &step_status, false);
     }
 }
 

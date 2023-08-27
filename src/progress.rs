@@ -1,14 +1,14 @@
 use std::time::{Instant};
 
-use console::Emoji;
+use console::{Emoji, Style};
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::run::{EStatus, RunStatus};
+use crate::run::{EStatus, RunStatus, StepStatus};
 
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
 
 pub trait Notify {
-    fn notify(&self, i: usize, status: &EStatus, msg: String, inc: bool);
+    fn notify(&self, i: usize, step_status: &StepStatus, inc: bool);
     fn notify_done(&self);
 }
 
@@ -19,29 +19,42 @@ pub struct ConsoleNotifier {
 }
 
 impl Notify for ConsoleNotifier {
-    fn notify(&self, i: usize, status: &EStatus, msg: String, inc: bool) {
+    fn notify(&self, i: usize, step_status: &StepStatus, inc: bool) {
         if let Some(progress) = self.progress_bars.get(i) {
             if inc {
                 progress.inc(1);
             }
-            match status {
+            let msg = step_status.run.to_string();
+            let dim_style: Style = Style::new().dim();
+            match step_status.status {
+
                 EStatus::Pending => {
-                    progress.set_message(msg)
+                    let pending_style: Style = Style::new().dim();
+                    let styled_status = pending_style.apply_to("Pending");
+                    progress.set_message(format!("{} {}", styled_status, dim_style.apply_to(msg)))
                 }
                 EStatus::Running => {
-                    progress.set_message(msg)
+                    let running_style: Style = Style::new().blue().bold();
+                    let styled_status = running_style.apply_to("Running");
+                    progress.set_message(format!("{} {}", styled_status, msg))
                 }
                 EStatus::Done => {
-                    progress.finish_with_message(msg)
+                    let done_style: Style = Style::new().green();
+                    let styled_status = done_style.apply_to("Done   ");
+                    progress.set_message(format!("{} {}", styled_status, dim_style.apply_to(msg)));
+                    progress.finish()
                 }
                 EStatus::Failed => {
-                    progress.abandon_with_message(msg)
+                    let failed_style: Style = Style::new().red().bold();
+                    let styled_status = failed_style.apply_to("Failed ");
+                    progress.set_message(format!("{} {}", styled_status, msg));
+                    progress.abandon()
                 }
             }
         }
     }
     fn notify_done(&self) {
-        let _ = self.multi_progress.clear();
+        // let _ = self.multi_progress.clear();
         println!("{} Done in {}", SPARKLE, HumanDuration(self.started.elapsed()));
     }
 }
@@ -55,12 +68,14 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
     let mut i = 0;
     let num_steps = run_status.steps.len();
     for step_status in run_status.steps.as_slice() {
-        let step_scripts = step_status.run_resolved.len();
-        let pb = notifier.multi_progress.add(ProgressBar::new(step_scripts as u64));
+        let num_step_scripts = step_status.run_resolved.len() + 1;
+        let pb = notifier.multi_progress.add(ProgressBar::new(num_step_scripts as u64));
         pb.set_style(create_spinner_style());
-        pb.set_prefix(format!("[{}/{}]", i + 1, num_steps));
-        pb.set_message("Pending");
+        let i_padding = if i < 10 && num_steps >= 10 { " " } else {""};
+        pb.set_prefix(format!("[{}]{}", i + 1, i_padding));
+        // pb.set_prefix(format!("[{}/{}]", i + 1, num_steps));
         notifier.progress_bars.push(pb);
+        notifier.notify(i.clone(), step_status, false);
         i += 1
     }
     notifier
@@ -68,7 +83,8 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
 
 
 fn create_spinner_style() -> ProgressStyle {
-    ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}")
+    ProgressStyle::with_template("{spinner} {prefix:.bold.dim} {wide_msg}")
         .unwrap()
-        .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ")
+        // .progress_chars("##-")
+        // .tick_chars("-| ")
 }
