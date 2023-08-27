@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
 use crate::progress::{create_console_notifier, Notify};
-use crate::repo::ensure_worktree;
+use crate::repo::{ensure_worktree, GitRepo};
 use crate::run::EStatus::Failed;
 use crate::run::{create_run_status_from_mend, run_step, ShellExecutor};
 use std::process::exit;
@@ -80,16 +80,18 @@ fn drive(mend: &Mend) {
     // repo could be remote but for now assume a local checkout
     let repo_dir_raw = Path::new(&from.repo);
     // Multiple concurrent runs will stomp on each other. Choose unique dir?
-    let repo_dir = expand_path(repo_dir_raw);
+    let base_repo_dir = expand_path(repo_dir_raw);
 
-    if let Ok(worktree_dir) = ensure_worktree(repo_dir.as_path(), ".mend/worktree2", &from.sha) {
+    if let Ok(worktree_dir) = ensure_worktree(base_repo_dir.as_path(), ".mend/worktree2", &from.sha) {
         if !worktree_dir.exists() {
             eprintln!(
                 "Worktree dir {} doesn't exist",
                 worktree_dir.to_string_lossy()
             );
         }
-
+        let worktree_repo = GitRepo {
+            repo_dir: worktree_dir
+        };
         for (key, value) in &mend.env {
             let expanded = shellexpand::env(value).unwrap();
             env::set_var(key, expanded.as_ref());
@@ -100,7 +102,7 @@ fn drive(mend: &Mend) {
             // println!("Starting: {}", &step_status.run);
             run_step(
                 &mut step_status,
-                &worktree_dir,
+                &worktree_repo,
                 &executor,
                 &notifier,
                 step_i,

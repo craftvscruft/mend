@@ -3,6 +3,13 @@ use anyhow::{bail, Context};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+pub trait Repo {
+    fn commit_all(&self, message: &str) -> anyhow::Result<()>;
+    fn reset_hard(&self) -> anyhow::Result<()>;
+    fn current_short_sha(&self) -> anyhow::Result<String>;
+    fn dir(&self) -> &Path;
+}
+
 pub fn ensure_worktree(
     repo_dir: &Path,
     work_dir_relative: &str,
@@ -38,44 +45,56 @@ pub fn ensure_worktree(
     Ok(work_dir_joined)
 }
 
-fn commit_all(repo_dir: &Path, message: &str) -> anyhow::Result<()> {
-    let output =
-        run_command_with_output(repo_dir, "git".to_string(), vec!["commit", "-am", message])?;
-    if !output.status.success() {
-        bail!(
+pub struct GitRepo {
+    pub repo_dir: PathBuf
+}
+
+impl Repo for GitRepo {
+
+    fn dir(&self) -> &Path {
+        &self.repo_dir
+    }
+    fn commit_all(&self, message: &str) -> anyhow::Result<()> {
+        let output =
+            run_command_with_output(&self.repo_dir, "git".to_string(), vec!["commit", "-am", message])?;
+        if !output.status.success() {
+            bail!(
             "Failed to commit, output:\n{}{}",
             String::from_utf8_lossy(&output.stdout).as_ref(),
             String::from_utf8_lossy(&output.stderr).as_ref()
         );
-    } else {
-        Ok(())
+        } else {
+            Ok(())
+        }
     }
-}
 
-fn reset_hard(repo_dir: &Path) -> anyhow::Result<()> {
-    let output = run_command_with_output(repo_dir, "git".to_string(), vec!["reset", "--hard"])?;
-    if !output.status.success() {
-        bail!(
+    fn reset_hard(&self) -> anyhow::Result<()> {
+        let output = run_command_with_output(&self.repo_dir, "git".to_string(), vec!["reset", "--hard"])?;
+        if !output.status.success() {
+            bail!(
             "Failed to commit, output:\n{}{}",
             String::from_utf8_lossy(&output.stdout).as_ref(),
             String::from_utf8_lossy(&output.stderr).as_ref()
         );
-    } else {
-        Ok(())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn current_short_sha(&self) -> anyhow::Result<String> {
+        let output = Command::new("git")
+            .current_dir(&self.repo_dir)
+            .args(["rev-parse", "--short", "HEAD"])
+            .output()
+            .expect("Could not get sha");
+        Ok(String::from_utf8(output.stdout)
+            .with_context(|| "Could not get sha")?
+            .trim()
+            .parse()?)
     }
 }
 
-fn current_short_sha(repo_dir: &Path) -> anyhow::Result<String> {
-    let output = Command::new("git")
-        .current_dir(repo_dir)
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .expect("Could not get sha");
-    Ok(String::from_utf8(output.stdout)
-        .with_context(|| "Could not get sha")?
-        .trim()
-        .parse()?)
-}
+
 
 #[cfg(test)]
 mod tests {
@@ -83,7 +102,7 @@ mod tests {
     use std::process::Command;
     use tempfile::tempdir_in;
 
-    use crate::repo::{commit_all, current_short_sha, ensure_worktree, reset_hard};
+    use crate::repo::{ensure_worktree, GitRepo, Repo};
 
     #[test]
     fn git_commands() {
@@ -95,32 +114,36 @@ mod tests {
             .unwrap()
             .to_str()
             .unwrap();
-        let repo_dir = temp_dir.path();
-        let worktree_dir = repo_dir.join(worktree_rel);
+        let base_repo_dir = temp_dir.path();
 
         let _ = Command::new("git")
-            .current_dir(repo_dir)
+            .current_dir(base_repo_dir)
             .arg("init")
-            .spawn()
+            .output()
             .expect("Could not init");
-        let _ = File::create(repo_dir.join("myfile")).unwrap();
+        let _ = File::create(base_repo_dir.join("myfile")).unwrap();
 
         let _ = Command::new("git")
-            .current_dir(repo_dir)
+            .current_dir(base_repo_dir)
             .args(["add", "myfile"])
-            .spawn()
+            .output()
             .expect("Could not git add  myfile");
+        let base_repo = GitRepo {
+            repo_dir: base_repo_dir.to_path_buf()
+        };
+        base_repo.commit_all("Initial").expect("Could not commit");
 
-        commit_all(repo_dir, "Initial");
+        let short_sha = base_repo.current_short_sha().unwrap();
+        let worktree_dir = ensure_worktree(base_repo_dir, worktree_rel, short_sha.as_str()).unwrap();
+        let worktree_repo = GitRepo {
+            repo_dir: worktree_dir
+        };
+        worktree_repo.reset_hard().expect("Could not git reset");
 
-        let short_sha = current_short_sha(repo_dir).unwrap();
-        ensure_worktree(repo_dir, worktree_rel, short_sha.as_str());
-        reset_hard(&worktree_dir);
-
-        assert_eq!(short_sha, current_short_sha(&worktree_dir).unwrap());
+        assert_eq!(short_sha, worktree_repo.current_short_sha().unwrap());
         // Can call ensure_worktree twice on the same directory
-        ensure_worktree(repo_dir, worktree_rel, short_sha.as_str());
-        assert_eq!(short_sha, current_short_sha(&worktree_dir).unwrap());
+        ensure_worktree(base_repo_dir, worktree_rel, short_sha.as_str()).expect("could not create worktree");
+        assert_eq!(short_sha, worktree_repo.current_short_sha().unwrap());
         // Hold onto references
         let _ = temp_subdir.close();
         let _ = temp_dir.close();

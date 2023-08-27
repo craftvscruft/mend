@@ -7,6 +7,7 @@ use std::fmt::Debug;
 use std::path::Path;
 use std::process::{Command, Output};
 use which::which;
+use crate::repo::Repo;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunStatus {
@@ -104,9 +105,9 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
     }
 }
 
-pub fn run_step<E: Executor, N: Notify>(
+pub fn run_step<R: Repo, E: Executor, N: Notify>(
     step_status: &mut StepStatus,
-    cwd: &Path,
+    repo: &R,
     executor: &E,
     notifier: &N,
     step_i: usize,
@@ -116,7 +117,7 @@ pub fn run_step<E: Executor, N: Notify>(
     let vec = &step_status.run_resolved;
     for script in vec {
         notifier.notify(step_i, step_status, true);
-        let output_result = executor.run_script(cwd, script);
+        let output_result = executor.run_script(repo.dir(), script);
         match output_result {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
