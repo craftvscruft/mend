@@ -18,5 +18,9 @@ jobs:
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --verbose
+    - name: Set dummy git user for tests
+      run: |
+        git config --global user.email "fake@example.com"
+        git config --global user.name "No Name"
     - name: Run tests
       run: cargo test --verbose
