@@ -1,0 +1,12 @@
+---
+source: src/run.rs
+expression: logger_ref_cell.borrow().messages
+---
+- Notify step 1 status Running inc true
+- "Executor run script:\n..before..\n"
+- Notify step 1 status Running inc true
+- "Executor run script:\n..cmd..\n"
+- Notify step 1 status Running inc true
+- "Executor run script:\n..after..\n"
+- Notify step 1 status Done inc true
+

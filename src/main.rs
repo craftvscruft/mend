@@ -76,7 +76,7 @@ fn drive(mend: &Mend) {
         .expect("No from declared in config")
         .clone();
     let run_status = create_run_status_from_mend(mend);
-    let notifier = create_console_notifier(&run_status);
+    let mut notifier = create_console_notifier(&run_status);
     // repo could be remote but for now assume a local checkout
     let repo_dir_raw = Path::new(&from.repo);
     // Multiple concurrent runs will stomp on each other. Choose unique dir?
@@ -89,7 +89,7 @@ fn drive(mend: &Mend) {
                 worktree_dir.to_string_lossy()
             );
         }
-        let worktree_repo = GitRepo {
+        let mut worktree_repo = GitRepo {
             repo_dir: worktree_dir
         };
         for (key, value) in &mend.env {
@@ -97,14 +97,14 @@ fn drive(mend: &Mend) {
             env::set_var(key, expanded.as_ref());
         }
         let mut step_i: usize = 0;
-        let executor = ShellExecutor {};
+        let mut executor = ShellExecutor {};
         for mut step_status in run_status.steps {
             // println!("Starting: {}", &step_status.run);
             run_step(
                 &mut step_status,
-                &worktree_repo,
-                &executor,
-                &notifier,
+                &mut worktree_repo,
+                &mut executor,
+                &mut notifier,
                 step_i,
             );
             step_i += 1;

@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub trait Repo {
-    fn commit_all(&self, message: &str) -> anyhow::Result<()>;
-    fn reset_hard(&self) -> anyhow::Result<()>;
+    fn commit_all(&mut self, message: &str) -> anyhow::Result<()>;
+    fn reset_hard(&mut self) -> anyhow::Result<()>;
     fn current_short_sha(&self) -> anyhow::Result<String>;
     fn dir(&self) -> &Path;
 }
@@ -54,7 +54,7 @@ impl Repo for GitRepo {
     fn dir(&self) -> &Path {
         &self.repo_dir
     }
-    fn commit_all(&self, message: &str) -> anyhow::Result<()> {
+    fn commit_all(&mut self, message: &str) -> anyhow::Result<()> {
         let output =
             run_command_with_output(&self.repo_dir, "git".to_string(), vec!["commit", "-am", message])?;
         if !output.status.success() {
@@ -68,7 +68,7 @@ impl Repo for GitRepo {
         }
     }
 
-    fn reset_hard(&self) -> anyhow::Result<()> {
+    fn reset_hard(&mut self) -> anyhow::Result<()> {
         let output = run_command_with_output(&self.repo_dir, "git".to_string(), vec!["reset", "--hard"])?;
         if !output.status.success() {
             bail!(
@@ -128,14 +128,14 @@ mod tests {
             .args(["add", "myfile"])
             .output()
             .expect("Could not git add  myfile");
-        let base_repo = GitRepo {
+        let mut base_repo = GitRepo {
             repo_dir: base_repo_dir.to_path_buf()
         };
         base_repo.commit_all("Initial").expect("Could not commit");
 
         let short_sha = base_repo.current_short_sha().unwrap();
         let worktree_dir = ensure_worktree(base_repo_dir, worktree_rel, short_sha.as_str()).unwrap();
-        let worktree_repo = GitRepo {
+        let mut worktree_repo = GitRepo {
             repo_dir: worktree_dir
         };
         worktree_repo.reset_hard().expect("Could not git reset");

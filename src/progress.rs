@@ -8,7 +8,7 @@ use crate::run::{EStatus, RunStatus, StepStatus};
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
 
 pub trait Notify {
-    fn notify(&self, i: usize, step_status: &StepStatus, inc: bool);
+    fn notify(&mut self, i: usize, step_status: &StepStatus, inc: bool);
     fn notify_done(&self);
 }
 
@@ -19,7 +19,7 @@ pub struct ConsoleNotifier {
 }
 
 impl Notify for ConsoleNotifier {
-    fn notify(&self, i: usize, step_status: &StepStatus, inc: bool) {
+    fn notify(&mut self, i: usize, step_status: &StepStatus, inc: bool) {
         if let Some(progress) = self.progress_bars.get(i) {
             if inc {
                 progress.inc(1);
