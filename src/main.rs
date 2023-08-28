@@ -1,10 +1,10 @@
+use anyhow::bail;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
-use anyhow::bail;
 
 use crate::progress::{create_console_notifier, Notify};
 use crate::repo::{ensure_worktree, GitRepo};
@@ -19,11 +19,11 @@ mod run;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
-    #[arg(short='f', long="file")]
+    #[arg(short = 'f', long = "file")]
     pub file: Option<String>,
 
-    #[arg(long="dry-run")]
-    pub dry_run: bool
+    #[arg(long = "dry-run")]
+    pub dry_run: bool,
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Mend {
@@ -74,7 +74,7 @@ fn main() {
             std::process::exit(0);
         }
         Err(err) => {
-                eprintln!("{:#}", err);
+            eprintln!("{:#}", err);
             std::process::exit(1);
         }
     }
@@ -112,8 +112,10 @@ fn drive(mend: &Mend) {
         let mut executor = ShellExecutor {};
         for mut step_status in run_status.steps {
             // println!("Starting: {}", &step_status.run);
+            let scripts = step_status.run_resolved.clone();
             run_step(
                 &mut step_status,
+                &scripts,
                 &mut worktree_repo,
                 &mut executor,
                 &mut notifier,
@@ -144,14 +146,15 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
             } else {
                 bail!("Specified file {} doesn't exist", file)
             }
-
         }
         None => {
             let toml_path = Path::new("mend.toml");
             if toml_path.exists() {
                 toml_path
             } else {
-                bail!("No mend.toml found, please specify one with -f or create one with `mend init`")
+                bail!(
+                    "No mend.toml found, please specify one with -f or create one with `mend init`"
+                )
             }
         }
     };
@@ -176,12 +179,12 @@ fn extend_mend(merged_mend: &mut Mend, include_mend: Mend) {
 
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
     use std::env;
     use std::path::PathBuf;
-    use clap::Parser;
 
     use crate::config::load_mend;
-    use crate::{Cli, run};
+    use crate::{run, Cli};
 
     fn path_from_manifest(rel_path: &str) -> PathBuf {
         let mut toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -213,14 +216,28 @@ mod tests {
 
     #[test]
     fn cli_fails_loading_specified_file() {
-        let result = run(&Cli::parse_from(vec!["mend", "--dry-run", "-f", path_from_manifest("tests/data/not-there.toml").to_str().unwrap()]));
+        let result = run(&Cli::parse_from(vec![
+            "mend",
+            "--dry-run",
+            "-f",
+            path_from_manifest("tests/data/not-there.toml")
+                .to_str()
+                .unwrap(),
+        ]));
         assert!(result.is_err());
         insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
     }
 
     #[test]
     fn cli_fails_loading_missing_include() {
-        let result = run(&Cli::parse_from(vec!["mend", "--dry-run", "-f", path_from_manifest("tests/data/missing-include.toml").to_str().unwrap()]));
+        let result = run(&Cli::parse_from(vec![
+            "mend",
+            "--dry-run",
+            "-f",
+            path_from_manifest("tests/data/missing-include.toml")
+                .to_str()
+                .unwrap(),
+        ]));
         assert!(result.is_err());
         insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
     }

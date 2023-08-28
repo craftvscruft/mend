@@ -3,12 +3,12 @@ use std::time::Instant;
 use console::{Emoji, Style};
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::run::{EStatus, RunStatus, StepStatus};
+use crate::run::{EStatus, RunStatus};
 
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
 
 pub trait Notify {
-    fn notify(&mut self, i: usize, step_status: &StepStatus, inc: bool);
+    fn notify(&mut self, i: usize, run: &str, status: &EStatus, sha: &Option<String>, inc: bool);
     fn notify_done(&self);
 }
 
@@ -19,19 +19,19 @@ pub struct ConsoleNotifier {
 }
 
 impl Notify for ConsoleNotifier {
-    fn notify(&mut self, i: usize, step_status: &StepStatus, inc: bool) {
+    fn notify(&mut self, i: usize, run: &str, status: &EStatus, sha: &Option<String>, inc: bool) {
         if let Some(progress) = self.progress_bars.get(i) {
             if inc {
                 progress.inc(1);
             }
-            let msg = step_status.run.to_string();
+            let msg = run.to_string();
             let dim_style: Style = Style::new().dim();
-            let sha = match &step_status.sha {
+            let sha = match sha {
                 None => "       ".to_string(),
-                Some(sha) => sha.clone(),
+                Some(sha) => sha.to_string(),
             };
             let dim_sha = dim_style.apply_to(sha);
-            match step_status.status {
+            match status {
                 EStatus::Pending => {
                     let pending_style: Style = Style::new().dim();
                     let styled_status = pending_style.apply_to("Pending");
@@ -95,7 +95,13 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
         pb.set_prefix(format!("[{}]{}", i + 1, i_padding));
         // pb.set_prefix(format!("[{}/{}]", i + 1, num_steps));
         notifier.progress_bars.push(pb);
-        notifier.notify(i, step_status, false);
+        notifier.notify(
+            i,
+            step_status.run.as_str(),
+            &step_status.status,
+            &step_status.sha,
+            false,
+        );
         i += 1
     }
     notifier

@@ -15,5 +15,8 @@ commit-fmt:
 commit-lint:
 	cargo clippy --fix && cargo test && git commit -am "r - cargo clippy --fix"
 
+test:
+	cargo test
+
 install:
 	cargo install --path .

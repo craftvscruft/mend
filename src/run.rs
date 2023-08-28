@@ -24,6 +24,15 @@ pub struct StepStatus {
     pub output: Option<String>,
 }
 
+impl StepStatus {
+    pub fn push_output_str(&mut self, text: &str) {
+        match &self.output {
+            None => self.output = Some(text.to_string()),
+            Some(prev_text) => self.output = Some(format!("{}\n{}", prev_text, text)),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum EStatus {
     Pending,
@@ -107,54 +116,85 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
 
 pub fn run_step<R: Repo, E: Executor, N: Notify>(
     step_status: &mut StepStatus,
+    scripts: &Vec<String>,
     repo: &mut R,
     executor: &mut E,
     notifier: &mut N,
     step_i: usize,
 ) {
     step_status.status = Running;
-    let mut output_text = "".to_owned();
-    let vec = &step_status.run_resolved;
-    for script in vec {
-        notifier.notify(step_i, step_status, true);
+    for script in scripts {
+        notifier.notify(
+            step_i,
+            &step_status.run,
+            &step_status.status,
+            &step_status.sha,
+            true,
+        );
+        step_status.push_output_str(format!("Running\n{}\n", script).as_str());
         let output_result = executor.run_script(repo.dir(), script);
         match output_result {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                output_text.push_str(stdout.as_ref());
-                output_text.push_str(stderr.as_ref());
+                step_status.push_output_str(stdout.as_ref());
+                step_status.push_output_str(stderr.as_ref());
                 if !output.status.success() {
                     step_status.status = Failed;
-                    notifier.notify(step_i, step_status, false);
+                    notifier.notify(
+                        step_i,
+                        &step_status.run,
+                        &step_status.status,
+                        &step_status.sha,
+                        false,
+                    );
                     break;
                 }
             }
-            Err(_e) => {
+            Err(e) => {
+                step_status.push_output_str(format!("Failed to run\n{:?}", e).as_str());
                 step_status.status = Failed;
-                notifier.notify(step_i, step_status, false);
+                notifier.notify(
+                    step_i,
+                    &step_status.run,
+                    &step_status.status,
+                    &step_status.sha,
+                    false,
+                );
             }
         }
     }
-    step_status.output = Some(output_text);
 
     if step_status.status != Failed {
         step_status.status = Done;
+        step_status.push_output_str("Committing...");
         match repo.commit_all(step_status.commit_msg.as_str()) {
             Ok(_) => {
                 if let Ok(sha) = repo.current_short_sha() {
                     step_status.sha = Some(sha)
                 }
             }
-            Err(_) => {
-                // Send output somewhere useful
+            Err(err) => {
+                step_status.push_output_str(format!("{:?}", err).as_str());
                 step_status.status = Failed
             }
         }
-        notifier.notify(step_i, step_status, true);
+        notifier.notify(
+            step_i,
+            &step_status.run,
+            &step_status.status,
+            &step_status.sha,
+            true,
+        );
     } else {
         let _ = repo.reset_hard();
-        notifier.notify(step_i, step_status, false);
+        notifier.notify(
+            step_i,
+            &step_status.run,
+            &step_status.status,
+            &step_status.sha,
+            false,
+        );
     }
 }
 
@@ -345,12 +385,18 @@ mod tests {
         logger: Rc<RefCell<TestLogger>>,
     }
     impl Notify for FakeNotifier {
-        fn notify(&mut self, i: usize, step_status: &StepStatus, inc: bool) {
+        fn notify(
+            &mut self,
+            i: usize,
+            _run: &str,
+            status: &EStatus,
+            _sha: &Option<String>,
+            inc: bool,
+        ) {
             let logger_ref_cell: &RefCell<TestLogger> = self.logger.borrow();
-            logger_ref_cell.borrow_mut().log(format!(
-                "Notify step {} status {:?} inc {}",
-                i, step_status.status, inc
-            ))
+            logger_ref_cell
+                .borrow_mut()
+                .log(format!("Notify step {} status {:?} inc {}", i, status, inc))
         }
 
         fn notify_done(&self) {
@@ -369,13 +415,14 @@ mod tests {
 
     #[test]
     fn run_step_reports_success_and_commits() {
+        let scripts = vec![
+            "..before..".to_string(),
+            "..cmd..".to_string(),
+            "..after..".to_string(),
+        ];
         let mut step_status = StepStatus {
             run: "cmd".to_string(),
-            run_resolved: vec![
-                "..before..".to_string(),
-                "..cmd..".to_string(),
-                "..after..".to_string(),
-            ],
+            run_resolved: scripts.clone(),
             commit_msg: "..msg..".to_string(),
             sha: None,
             status: EStatus::Pending,
@@ -395,7 +442,14 @@ mod tests {
         let mut notifier = FakeNotifier {
             logger: logger_rc.clone(),
         };
-        run_step(&mut step_status, &mut repo, &mut executor, &mut notifier, 1);
+        run_step(
+            &mut step_status,
+            &scripts,
+            &mut repo,
+            &mut executor,
+            &mut notifier,
+            1,
+        );
         assert_eq!(step_status.status, EStatus::Done);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
         insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
@@ -404,13 +458,14 @@ mod tests {
 
     #[test]
     fn run_step_reports_failure_and_resets() {
+        let scripts = vec![
+            "..before..".to_string(),
+            "..cmd..".to_string(),
+            "..after..".to_string(),
+        ];
         let mut step_status = StepStatus {
             run: "cmd".to_string(),
-            run_resolved: vec![
-                "..before..".to_string(),
-                "..cmd..".to_string(),
-                "..after..".to_string(),
-            ],
+            run_resolved: scripts.clone(),
             commit_msg: "..msg..".to_string(),
             sha: None,
             status: EStatus::Pending,
@@ -430,7 +485,14 @@ mod tests {
         let mut notifier = FakeNotifier {
             logger: logger_rc.clone(),
         };
-        run_step(&mut step_status, &mut repo, &mut executor, &mut notifier, 1);
+        run_step(
+            &mut step_status,
+            &scripts,
+            &mut repo,
+            &mut executor,
+            &mut notifier,
+            1,
+        );
         assert_eq!(step_status.status, EStatus::Failed);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
         insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
