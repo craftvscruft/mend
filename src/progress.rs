@@ -26,27 +26,32 @@ impl Notify for ConsoleNotifier {
             }
             let msg = step_status.run.to_string();
             let dim_style: Style = Style::new().dim();
+            let sha = match &step_status.sha {
+                None => { "       ".to_string() }
+                Some(sha) => { sha.clone() }
+            };
+            let dim_sha = dim_style.apply_to(sha);
             match step_status.status {
                 EStatus::Pending => {
                     let pending_style: Style = Style::new().dim();
                     let styled_status = pending_style.apply_to("Pending");
-                    progress.set_message(format!("{} {}", styled_status, dim_style.apply_to(msg)))
+                    progress.set_message(format!("{} {} {}", dim_sha, styled_status, dim_style.apply_to(msg)))
                 }
                 EStatus::Running => {
                     let running_style: Style = Style::new().blue().bold();
                     let styled_status = running_style.apply_to("Running");
-                    progress.set_message(format!("{} {}", styled_status, msg))
+                    progress.set_message(format!("{} {} {}", dim_sha, styled_status, msg))
                 }
                 EStatus::Done => {
                     let done_style: Style = Style::new().green();
                     let styled_status = done_style.apply_to("Done   ");
-                    progress.set_message(format!("{} {}", styled_status, dim_style.apply_to(msg)));
+                    progress.set_message(format!("{} {} {}", dim_sha, styled_status, dim_style.apply_to(msg)));
                     progress.finish()
                 }
                 EStatus::Failed => {
                     let failed_style: Style = Style::new().red().bold();
                     let styled_status = failed_style.apply_to("Failed ");
-                    progress.set_message(format!("{} {}", styled_status, msg));
+                    progress.set_message(format!("{} {} {}", dim_sha, styled_status, msg));
                     progress.abandon()
                 }
             }
@@ -76,7 +81,7 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
             .multi_progress
             .add(ProgressBar::new(num_step_scripts as u64));
         pb.set_style(create_spinner_style());
-        let i_padding = if i < 10 && num_steps >= 10 { " " } else { "" };
+        let i_padding = if i < 9 && num_steps >= 10 { " " } else { "" };
         pb.set_prefix(format!("[{}]{}", i + 1, i_padding));
         // pb.set_prefix(format!("[{}/{}]", i + 1, num_steps));
         notifier.progress_bars.push(pb);

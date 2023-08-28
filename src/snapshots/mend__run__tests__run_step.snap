@@ -8,5 +8,6 @@ expression: logger_ref_cell.borrow().messages
 - "Executor run script:\n..cmd..\n"
 - Notify step 1 status Running inc true
 - "Executor run script:\n..after..\n"
+- "Repo commit all with msg '..msg..'"
 - Notify step 1 status Done inc true
 

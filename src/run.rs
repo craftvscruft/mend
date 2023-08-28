@@ -137,8 +137,20 @@ pub fn run_step<R: Repo, E: Executor, N: Notify>(
         }
     }
     step_status.output = Some(output_text);
+
     if step_status.status != Failed {
         step_status.status = Done;
+        match repo.commit_all(step_status.commit_msg.as_str()) {
+            Ok(_) => {
+                if let Ok(sha) = repo.current_short_sha() {
+                    step_status.sha = Some(sha)
+                }
+            }
+            Err(_) => {
+                // Send output somewhere useful
+                step_status.status = Failed
+            }
+        }
         notifier.notify(step_i, step_status, true);
     } else {
         notifier.notify(step_i, step_status, false);
@@ -342,7 +354,7 @@ mod tests {
         let mut step_status = StepStatus {
             run: "cmd".to_string(),
             run_resolved: vec!["..before..".to_string(), "..cmd..".to_string(), "..after..".to_string()],
-            commit_msg: "".to_string(),
+            commit_msg: "..msg..".to_string(),
             sha: None,
             status: EStatus::Pending,
             output: None,
@@ -366,6 +378,7 @@ mod tests {
         assert_eq!(step_status.status, EStatus::Done);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
         insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
+        assert_eq!(step_status.sha, Some("..SHA..".to_string()));
 
     }
 }
