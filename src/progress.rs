@@ -3,7 +3,7 @@ use std::time::Instant;
 use console::{Emoji, Style};
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::run::{EStatus, RunStatus};
+use crate::run::{EStatus, StepRequest};
 
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
 
@@ -77,16 +77,16 @@ impl Notify for ConsoleNotifier {
     }
 }
 
-pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
+pub fn create_console_notifier(step_requests: &Vec<StepRequest>) -> ConsoleNotifier {
     let mut notifier = ConsoleNotifier {
         started: Instant::now(),
         multi_progress: MultiProgress::new(),
         progress_bars: vec![],
     };
     let mut i = 0;
-    let num_steps = run_status.steps.len();
-    for step_status in run_status.steps.as_slice() {
-        let num_step_scripts = step_status.step_request.run_resolved.len() + 1;
+    let num_steps = step_requests.len();
+    for step_request in step_requests {
+        let num_step_scripts = step_request.run_resolved.len() + 1;
         let pb = notifier
             .multi_progress
             .add(ProgressBar::new(num_step_scripts as u64));
@@ -97,9 +97,9 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
         notifier.progress_bars.push(pb);
         notifier.notify(
             i,
-            step_status.step_request.run.as_str(),
-            &step_status.step_response.status,
-            &step_status.step_response.sha,
+            step_request.run.as_str(),
+            &EStatus::Pending,
+            &None,
             false,
         );
         i += 1

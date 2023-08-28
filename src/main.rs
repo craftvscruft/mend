@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use crate::progress::{create_console_notifier, Notify};
 use crate::repo::{ensure_worktree, GitRepo};
 use crate::run::EStatus::Failed;
-use crate::run::{create_run_status_from_mend, run_step, ShellExecutor};
+use crate::run::{create_run_status_from_mend, EStatus, run_step, ShellExecutor, StepResponse};
 
 mod config;
 mod progress;
@@ -86,8 +86,8 @@ fn drive(mend: &Mend) {
         .as_ref()
         .expect("No from declared in config")
         .clone();
-    let run_status = create_run_status_from_mend(mend);
-    let mut notifier = create_console_notifier(&run_status);
+    let step_requests = create_run_status_from_mend(mend);
+    let mut notifier = create_console_notifier(&step_requests);
     // repo could be remote but for now assume a local checkout
     let repo_dir_raw = Path::new(&from.repo);
     // Multiple concurrent runs will stomp on each other. Choose unique dir?
@@ -110,21 +110,23 @@ fn drive(mend: &Mend) {
         }
         let mut step_i: usize = 0;
         let mut executor = ShellExecutor {};
-        for mut step_status in run_status.steps {
+        for step_request in step_requests {
             // println!("Starting: {}", &step_status.run);
-            let scripts = step_status.step_request.run_resolved.clone();
+            let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
+            let scripts = step_request.run_resolved.clone();
             run_step(
                 &scripts,
                 &mut worktree_repo,
                 &mut executor,
                 &mut notifier,
                 step_i,
-                &step_status.step_request,
-                &mut step_status.step_response,
+                &step_request,
+                &mut step_response,
             );
             step_i += 1;
-            if step_status.step_response.status == Failed {
-                println!("{:?}", step_status);
+            if step_response.status == Failed {
+                println!("Failed on {:?}", step_request);
+                println!("Response {:?}", step_response);
                 break;
             }
             // println!("...Done")

@@ -10,11 +10,6 @@ use std::process::{Command, Output};
 use which::which;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct RunStatus {
-    pub steps: Vec<StepStatus>,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct StepRequest {
     pub run: String,
     pub run_resolved: Vec<String>,
@@ -26,12 +21,6 @@ pub struct StepResponse {
     pub sha: Option<String>,
     pub status: EStatus,
     pub output: Option<String>
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct StepStatus {
-    pub step_request: StepRequest,
-    pub step_response: StepResponse,
 }
 
 impl StepResponse {
@@ -105,19 +94,17 @@ fn add_matching_hooks(scripts: &mut Vec<String>, mend: &Mend, key: &str, tags: &
     }
 }
 
-pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
-    RunStatus {
-        steps: mend
+pub fn create_run_status_from_mend(mend: &Mend) -> Vec<StepRequest> {
+    mend
             .steps
             .iter()
             .map({
-                |step| StepStatus {
-                    step_request: StepRequest { run: step.to_string(), run_resolved: resolve_step_scripts(step.to_string(), mend), commit_msg: step.to_string() },
-                    step_response: StepResponse { sha: None, status: EStatus::Pending, output: None }
+                |step_text| StepRequest {
+                    run: step_text.to_string(),
+                    run_resolved: resolve_step_scripts(step_text.to_string(), mend),
+                    commit_msg: step_text.to_string()
                 }
-            })
-            .collect(),
-    }
+            }).collect()
 }
 
 pub fn run_step<R: Repo, E: Executor, N: Notify>(
@@ -222,7 +209,7 @@ pub fn run_command_with_output(
 mod tests {
     use crate::progress::Notify;
     use crate::repo::Repo;
-    use crate::run::{create_run_status_from_mend, run_command_with_output, run_step, EStatus, Executor, StepStatus, StepRequest, StepResponse};
+    use crate::run::{create_run_status_from_mend, run_command_with_output, run_step, EStatus, Executor, StepRequest, StepResponse};
     use crate::{Hook, Mend, Recipe};
     use std::borrow::Borrow;
     use std::cell::RefCell;
@@ -240,9 +227,9 @@ mod tests {
     #[test]
     fn test_create_run_status_one_step() {
         let mend = create_mend_with_steps(vec!["cmd arg1 arg2".to_string()]);
-        let status = create_run_status_from_mend(&mend);
-        assert_eq!(status.steps.len(), 1);
-        insta::assert_yaml_snapshot!(status);
+        let step_requests = create_run_status_from_mend(&mend);
+        assert_eq!(step_requests.len(), 1);
+        insta::assert_yaml_snapshot!(step_requests);
     }
 
     #[test]
@@ -267,9 +254,9 @@ mod tests {
                 tags: vec![],
             },
         );
-        let status = create_run_status_from_mend(&mend);
-        assert_eq!(status.steps.len(), 1);
-        insta::assert_yaml_snapshot!(status);
+        let step_requests = create_run_status_from_mend(&mend);
+        assert_eq!(step_requests.len(), 1);
+        insta::assert_yaml_snapshot!(step_requests);
     }
 
     #[test]
@@ -290,9 +277,9 @@ mod tests {
             .insert("before_step".to_string(), vec![before_step_hook]);
         mend.hooks
             .insert("after_step".to_string(), vec![after_step_hook]);
-        let status = create_run_status_from_mend(&mend);
-        assert_eq!(status.steps.len(), 1);
-        insta::assert_yaml_snapshot!(status);
+        let step_requests = create_run_status_from_mend(&mend);
+        assert_eq!(step_requests.len(), 1);
+        insta::assert_yaml_snapshot!(step_requests);
     }
 
     #[test]
@@ -322,9 +309,9 @@ mod tests {
                 tags: vec!["some_tag".to_string()],
             },
         );
-        let status = create_run_status_from_mend(&mend);
-        assert_eq!(status.steps.len(), 1);
-        insta::assert_yaml_snapshot!(status);
+        let step_requests = create_run_status_from_mend(&mend);
+        assert_eq!(step_requests.len(), 1);
+        insta::assert_yaml_snapshot!(step_requests);
     }
 
     fn create_mend_with_steps(steps: Vec<String>) -> Mend {
@@ -462,10 +449,8 @@ mod tests {
             "..cmd..".to_string(),
             "..after..".to_string(),
         ];
-        let mut step_status = StepStatus {
-            step_request: StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() },
-            step_response: StepResponse { sha: None, status: EStatus::Pending, output: None }
-        };
+        let step_request = StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() };
+        let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
 
         // The intent here is is to log is to log all interactions with the  fake objects in one vec.
         // I may have done something silly here to get the compiler to accept it. Better ideas?
@@ -486,12 +471,12 @@ mod tests {
             &mut executor,
             &mut notifier,
             1,
-            &step_status.step_request,
-            &mut step_status.step_response,
+            &step_request,
+            &mut step_response,
         );
-        assert_eq!(step_status.step_response.status, EStatus::Failed);
+        assert_eq!(step_response.status, EStatus::Failed);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
         insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
-        assert_eq!(step_status.step_response.sha, None);
+        assert_eq!(step_response.sha, None);
     }
 }
