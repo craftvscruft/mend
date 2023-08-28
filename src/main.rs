@@ -114,12 +114,13 @@ fn drive(mend: &Mend) {
             // println!("Starting: {}", &step_status.run);
             let scripts = step_status.step_request.run_resolved.clone();
             run_step(
-                &mut step_status,
                 &scripts,
                 &mut worktree_repo,
                 &mut executor,
                 &mut notifier,
                 step_i,
+                &step_status.step_request,
+                &mut step_status.step_response,
             );
             step_i += 1;
             if step_status.step_response.status == Failed {

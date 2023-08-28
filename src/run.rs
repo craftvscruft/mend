@@ -31,15 +31,14 @@ pub struct StepResponse {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct StepStatus {
     pub step_request: StepRequest,
-
     pub step_response: StepResponse,
 }
 
-impl StepStatus {
+impl StepResponse {
     pub fn push_output_str(&mut self, text: &str) {
-        match &self.step_response.output {
-            None => self.step_response.output = Some(text.to_string()),
-            Some(prev_text) => self.step_response.output = Some(format!("{}\n{}", prev_text, text)),
+        match &self.output {
+            None => self.output = Some(text.to_string()),
+            Some(prev_text) => self.output = Some(format!("{}\n{}", prev_text, text)),
         }
     }
 }
@@ -122,84 +121,85 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
 }
 
 pub fn run_step<R: Repo, E: Executor, N: Notify>(
-    step_status: &mut StepStatus,
     scripts: &Vec<String>,
     repo: &mut R,
     executor: &mut E,
     notifier: &mut N,
     step_i: usize,
+    step_request: &StepRequest,
+    step_response: &mut StepResponse,
 ) {
-    step_status.step_response.status = Running;
+    step_response.status = Running;
     for script in scripts {
         notifier.notify(
             step_i,
-            &step_status.step_request.run,
-            &step_status.step_response.status,
-            &step_status.step_response.sha,
+            &step_request.run,
+            &step_response.status,
+            &step_response.sha,
             true,
         );
-        step_status.push_output_str(format!("Running\n{}\n", script).as_str());
+        step_response.push_output_str(format!("Running\n{}\n", script).as_str());
         let output_result = executor.run_script(repo.dir(), script);
         match output_result {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                step_status.push_output_str(stdout.as_ref());
-                step_status.push_output_str(stderr.as_ref());
+                step_response.push_output_str(stdout.as_ref());
+                step_response.push_output_str(stderr.as_ref());
                 if !output.status.success() {
-                    step_status.step_response.status = Failed;
+                    step_response.status = Failed;
                     notifier.notify(
                         step_i,
-                        &step_status.step_request.run,
-                        &step_status.step_response.status,
-                        &step_status.step_response.sha,
+                        &step_request.run,
+                        &step_response.status,
+                        &step_response.sha,
                         false,
                     );
                     break;
                 }
             }
             Err(e) => {
-                step_status.push_output_str(format!("Failed to run\n{:?}", e).as_str());
-                step_status.step_response.status = Failed;
+                step_response.push_output_str(format!("Failed to run\n{:?}", e).as_str());
+                step_response.status = Failed;
                 notifier.notify(
                     step_i,
-                    &step_status.step_request.run,
-                    &step_status.step_response.status,
-                    &step_status.step_response.sha,
+                    &step_request.run,
+                    &step_response.status,
+                    &step_response.sha,
                     false,
                 );
             }
         }
     }
 
-    if step_status.step_response.status != Failed {
-        step_status.step_response.status = Done;
-        step_status.push_output_str("Committing...");
-        match repo.commit_all(step_status.step_request.commit_msg.as_str()) {
+    if step_response.status != Failed {
+        step_response.status = Done;
+        step_response.push_output_str("Committing...");
+        match repo.commit_all(step_request.commit_msg.as_str()) {
             Ok(_) => {
                 if let Ok(sha) = repo.current_short_sha() {
-                    step_status.step_response.sha = Some(sha)
+                    step_response.sha = Some(sha)
                 }
             }
             Err(err) => {
-                step_status.push_output_str(format!("{:?}", err).as_str());
-                step_status.step_response.status = Failed
+                step_response.push_output_str(format!("{:?}", err).as_str());
+                step_response.status = Failed
             }
         }
         notifier.notify(
             step_i,
-            &step_status.step_request.run,
-            &step_status.step_response.status,
-            &step_status.step_response.sha,
+            &step_request.run,
+            &step_response.status,
+            &step_response.sha,
             true,
         );
     } else {
         let _ = repo.reset_hard();
         notifier.notify(
             step_i,
-            &step_status.step_request.run,
-            &step_status.step_response.status,
-            &step_status.step_response.sha,
+            &step_request.run,
+            &step_response.status,
+            &step_response.sha,
             false,
         );
     }
@@ -424,10 +424,8 @@ mod tests {
             "..cmd..".to_string(),
             "..after..".to_string(),
         ];
-        let mut step_status = StepStatus {
-            step_request: StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() },
-            step_response: StepResponse { sha: None, status: EStatus::Pending, output: None }
-        };
+        let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
+        let step_request = StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() };
 
         // The intent here is is to log is to log all interactions with the  fake objects in one vec.
         // I may have done something silly here to get the compiler to accept it. Better ideas?
@@ -443,17 +441,18 @@ mod tests {
             logger: logger_rc.clone(),
         };
         run_step(
-            &mut step_status,
             &scripts,
             &mut repo,
             &mut executor,
             &mut notifier,
             1,
+            &step_request,
+            &mut step_response,
         );
-        assert_eq!(step_status.step_response.status, EStatus::Done);
+        assert_eq!(step_response.status, EStatus::Done);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
         insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
-        assert_eq!(step_status.step_response.sha, Some("..SHA..".to_string()));
+        assert_eq!(step_response.sha, Some("..SHA..".to_string()));
     }
 
     #[test]
@@ -482,12 +481,13 @@ mod tests {
             logger: logger_rc.clone(),
         };
         run_step(
-            &mut step_status,
             &scripts,
             &mut repo,
             &mut executor,
             &mut notifier,
             1,
+            &step_status.step_request,
+            &mut step_status.step_response,
         );
         assert_eq!(step_status.step_response.status, EStatus::Failed);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
