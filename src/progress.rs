@@ -38,7 +38,7 @@ impl Notify for ConsoleNotifier {
                     progress.set_message(format!("{} {} {}", dim_sha, styled_status, dim_style.apply_to(msg)))
                 }
                 EStatus::Running => {
-                    let running_style: Style = Style::new().blue().bold();
+                    let running_style: Style = Style::new().cyan();
                     let styled_status = running_style.apply_to("Running");
                     progress.set_message(format!("{} {} {}", dim_sha, styled_status, msg))
                 }
@@ -92,7 +92,5 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
 }
 
 fn create_spinner_style() -> ProgressStyle {
-    ProgressStyle::with_template("{spinner} {prefix:.bold.dim} {wide_msg}").unwrap()
-    // .progress_chars("##-")
-    // .tick_chars("-| ")
+    ProgressStyle::with_template("{prefix:.bold.dim} {wide_msg}").unwrap()
 }

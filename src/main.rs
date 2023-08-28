@@ -127,7 +127,7 @@ fn run(cli: &Cli) {
     match config::load_mend(cli) {
         Ok(merged_mend) => match toml::to_string_pretty(&merged_mend) {
             Ok(text) => {
-                println!("{}", text);
+                // println!("{}", text);
                 drive(&merged_mend)
             }
             Err(e) => {
