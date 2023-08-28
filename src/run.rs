@@ -108,7 +108,6 @@ pub fn create_run_status_from_mend(mend: &Mend) -> Vec<StepRequest> {
 }
 
 pub fn run_step<R: Repo, E: Executor, N: Notify>(
-    scripts: &Vec<String>,
     repo: &mut R,
     executor: &mut E,
     notifier: &mut N,
@@ -117,7 +116,7 @@ pub fn run_step<R: Repo, E: Executor, N: Notify>(
     step_response: &mut StepResponse,
 ) {
     step_response.status = Running;
-    for script in scripts {
+    for script in &step_request.run_resolved {
         notifier.notify(
             step_i,
             &step_request.run,
@@ -428,7 +427,6 @@ mod tests {
             logger: logger_rc.clone(),
         };
         run_step(
-            &scripts,
             &mut repo,
             &mut executor,
             &mut notifier,
@@ -466,7 +464,6 @@ mod tests {
             logger: logger_rc.clone(),
         };
         run_step(
-            &scripts,
             &mut repo,
             &mut executor,
             &mut notifier,

@@ -108,14 +108,12 @@ fn drive(mend: &Mend) {
             let expanded = shellexpand::env(value).unwrap();
             env::set_var(key, expanded.as_ref());
         }
-        let mut step_i: usize = 0;
+
         let mut executor = ShellExecutor {};
+        let mut step_i: usize = 0;
         for step_request in step_requests {
-            // println!("Starting: {}", &step_status.run);
             let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
-            let scripts = step_request.run_resolved.clone();
             run_step(
-                &scripts,
                 &mut worktree_repo,
                 &mut executor,
                 &mut notifier,
@@ -129,7 +127,6 @@ fn drive(mend: &Mend) {
                 println!("Response {:?}", step_response);
                 break;
             }
-            // println!("...Done")
         }
         notifier.notify_done()
     }
