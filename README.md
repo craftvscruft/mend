@@ -51,10 +51,34 @@ using the steps in [examples/mend.toml](examples/mend.toml).
 
 ## Running
 
+Make sure ~/.cargo/bin is on you path:
+```sh
+export PATH="$PATH:$HOME/.cargo/bin"
 ```
-cargo run -- -f mend.toml
+
+Then clone the project and run cargo install:
+```sh
+git clone git@github.com:craftvscruft/mend.git
+cd mend
+
+cargo install --path .
 ```
+
+Then you can run with `mend`
+
+```sh
+mend -f mend.toml
+```
+
 More info on creating mend.toml coming soon, in the meantime checkout [examples/mend.toml](examples/mend.toml).
+
+
+### Running without installing
+```
+cd mend
+
+cargo run -- <ARGS>
+```
 
 
 ## Testing
@@ -81,7 +105,7 @@ cargo insta review
 
 * Martin Fowler's [Refactoring](https://refactoring.com) book and catalog
 * Kent Beck's [TCR](https://medium.com/p/870bbd756864) == Test && Commit || Revert
-* Marianne Bellotti's [Kill It With Fire](https://nostarch.com/kill-it-fire)
+* Marianne Bellotti's [Kill It With Fire](https://nostarch.com/kill-it-fire) book
 * [Arlo Belshee's Commit Notation](https://github.com/RefactoringCombos/ArlosCommitNotation)
 * [IOCCC](https://www.ioccc.org) - International Obfuscated C Code Contest
 
