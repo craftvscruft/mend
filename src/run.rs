@@ -15,20 +15,31 @@ pub struct RunStatus {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct StepStatus {
+pub struct StepRequest {
     pub run: String,
     pub run_resolved: Vec<String>,
-    pub commit_msg: String,
+    pub commit_msg: String
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct StepResponse {
     pub sha: Option<String>,
     pub status: EStatus,
-    pub output: Option<String>,
+    pub output: Option<String>
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct StepStatus {
+    pub step_request: StepRequest,
+
+    pub step_response: StepResponse,
 }
 
 impl StepStatus {
     pub fn push_output_str(&mut self, text: &str) {
-        match &self.output {
-            None => self.output = Some(text.to_string()),
-            Some(prev_text) => self.output = Some(format!("{}\n{}", prev_text, text)),
+        match &self.step_response.output {
+            None => self.step_response.output = Some(text.to_string()),
+            Some(prev_text) => self.step_response.output = Some(format!("{}\n{}", prev_text, text)),
         }
     }
 }
@@ -102,12 +113,8 @@ pub fn create_run_status_from_mend(mend: &Mend) -> RunStatus {
             .iter()
             .map({
                 |step| StepStatus {
-                    run: step.to_string(),
-                    run_resolved: resolve_step_scripts(step.to_string(), mend),
-                    commit_msg: step.to_string(),
-                    sha: None,
-                    status: EStatus::Pending,
-                    output: None,
+                    step_request: StepRequest { run: step.to_string(), run_resolved: resolve_step_scripts(step.to_string(), mend), commit_msg: step.to_string() },
+                    step_response: StepResponse { sha: None, status: EStatus::Pending, output: None }
                 }
             })
             .collect(),
@@ -122,13 +129,13 @@ pub fn run_step<R: Repo, E: Executor, N: Notify>(
     notifier: &mut N,
     step_i: usize,
 ) {
-    step_status.status = Running;
+    step_status.step_response.status = Running;
     for script in scripts {
         notifier.notify(
             step_i,
-            &step_status.run,
-            &step_status.status,
-            &step_status.sha,
+            &step_status.step_request.run,
+            &step_status.step_response.status,
+            &step_status.step_response.sha,
             true,
         );
         step_status.push_output_str(format!("Running\n{}\n", script).as_str());
@@ -140,12 +147,12 @@ pub fn run_step<R: Repo, E: Executor, N: Notify>(
                 step_status.push_output_str(stdout.as_ref());
                 step_status.push_output_str(stderr.as_ref());
                 if !output.status.success() {
-                    step_status.status = Failed;
+                    step_status.step_response.status = Failed;
                     notifier.notify(
                         step_i,
-                        &step_status.run,
-                        &step_status.status,
-                        &step_status.sha,
+                        &step_status.step_request.run,
+                        &step_status.step_response.status,
+                        &step_status.step_response.sha,
                         false,
                     );
                     break;
@@ -153,46 +160,46 @@ pub fn run_step<R: Repo, E: Executor, N: Notify>(
             }
             Err(e) => {
                 step_status.push_output_str(format!("Failed to run\n{:?}", e).as_str());
-                step_status.status = Failed;
+                step_status.step_response.status = Failed;
                 notifier.notify(
                     step_i,
-                    &step_status.run,
-                    &step_status.status,
-                    &step_status.sha,
+                    &step_status.step_request.run,
+                    &step_status.step_response.status,
+                    &step_status.step_response.sha,
                     false,
                 );
             }
         }
     }
 
-    if step_status.status != Failed {
-        step_status.status = Done;
+    if step_status.step_response.status != Failed {
+        step_status.step_response.status = Done;
         step_status.push_output_str("Committing...");
-        match repo.commit_all(step_status.commit_msg.as_str()) {
+        match repo.commit_all(step_status.step_request.commit_msg.as_str()) {
             Ok(_) => {
                 if let Ok(sha) = repo.current_short_sha() {
-                    step_status.sha = Some(sha)
+                    step_status.step_response.sha = Some(sha)
                 }
             }
             Err(err) => {
                 step_status.push_output_str(format!("{:?}", err).as_str());
-                step_status.status = Failed
+                step_status.step_response.status = Failed
             }
         }
         notifier.notify(
             step_i,
-            &step_status.run,
-            &step_status.status,
-            &step_status.sha,
+            &step_status.step_request.run,
+            &step_status.step_response.status,
+            &step_status.step_response.sha,
             true,
         );
     } else {
         let _ = repo.reset_hard();
         notifier.notify(
             step_i,
-            &step_status.run,
-            &step_status.status,
-            &step_status.sha,
+            &step_status.step_request.run,
+            &step_status.step_response.status,
+            &step_status.step_response.sha,
             false,
         );
     }
@@ -215,10 +222,7 @@ pub fn run_command_with_output(
 mod tests {
     use crate::progress::Notify;
     use crate::repo::Repo;
-    use crate::run::{
-        create_run_status_from_mend, run_command_with_output, run_step, EStatus, Executor,
-        StepStatus,
-    };
+    use crate::run::{create_run_status_from_mend, run_command_with_output, run_step, EStatus, Executor, StepStatus, StepRequest, StepResponse};
     use crate::{Hook, Mend, Recipe};
     use std::borrow::Borrow;
     use std::cell::RefCell;
@@ -421,12 +425,8 @@ mod tests {
             "..after..".to_string(),
         ];
         let mut step_status = StepStatus {
-            run: "cmd".to_string(),
-            run_resolved: scripts.clone(),
-            commit_msg: "..msg..".to_string(),
-            sha: None,
-            status: EStatus::Pending,
-            output: None,
+            step_request: StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() },
+            step_response: StepResponse { sha: None, status: EStatus::Pending, output: None }
         };
 
         // The intent here is is to log is to log all interactions with the  fake objects in one vec.
@@ -450,10 +450,10 @@ mod tests {
             &mut notifier,
             1,
         );
-        assert_eq!(step_status.status, EStatus::Done);
+        assert_eq!(step_status.step_response.status, EStatus::Done);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
         insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
-        assert_eq!(step_status.sha, Some("..SHA..".to_string()));
+        assert_eq!(step_status.step_response.sha, Some("..SHA..".to_string()));
     }
 
     #[test]
@@ -464,12 +464,8 @@ mod tests {
             "..after..".to_string(),
         ];
         let mut step_status = StepStatus {
-            run: "cmd".to_string(),
-            run_resolved: scripts.clone(),
-            commit_msg: "..msg..".to_string(),
-            sha: None,
-            status: EStatus::Pending,
-            output: None,
+            step_request: StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() },
+            step_response: StepResponse { sha: None, status: EStatus::Pending, output: None }
         };
 
         // The intent here is is to log is to log all interactions with the  fake objects in one vec.
@@ -493,9 +489,9 @@ mod tests {
             &mut notifier,
             1,
         );
-        assert_eq!(step_status.status, EStatus::Failed);
+        assert_eq!(step_status.step_response.status, EStatus::Failed);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
         insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
-        assert_eq!(step_status.sha, None);
+        assert_eq!(step_status.step_response.sha, None);
     }
 }

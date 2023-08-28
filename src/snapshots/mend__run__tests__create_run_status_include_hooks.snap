@@ -3,13 +3,15 @@ source: src/run.rs
 expression: status
 ---
 steps:
-  - run: cmd arg1 arg2
-    run_resolved:
-      - echo Hello before
-      - "cmd arg1 arg2\n"
-      - echo Hello after
-    commit_msg: cmd arg1 arg2
-    sha: ~
-    status: Pending
-    output: ~
+  - step_request:
+      run: cmd arg1 arg2
+      run_resolved:
+        - echo Hello before
+        - "cmd arg1 arg2\n"
+        - echo Hello after
+      commit_msg: cmd arg1 arg2
+    step_response:
+      sha: ~
+      status: Pending
+      output: ~
 

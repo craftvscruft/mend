@@ -112,7 +112,7 @@ fn drive(mend: &Mend) {
         let mut executor = ShellExecutor {};
         for mut step_status in run_status.steps {
             // println!("Starting: {}", &step_status.run);
-            let scripts = step_status.run_resolved.clone();
+            let scripts = step_status.step_request.run_resolved.clone();
             run_step(
                 &mut step_status,
                 &scripts,
@@ -122,7 +122,7 @@ fn drive(mend: &Mend) {
                 step_i,
             );
             step_i += 1;
-            if step_status.status == Failed {
+            if step_status.step_response.status == Failed {
                 println!("{:?}", step_status);
                 break;
             }

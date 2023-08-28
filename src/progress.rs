@@ -86,7 +86,7 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
     let mut i = 0;
     let num_steps = run_status.steps.len();
     for step_status in run_status.steps.as_slice() {
-        let num_step_scripts = step_status.run_resolved.len() + 1;
+        let num_step_scripts = step_status.step_request.run_resolved.len() + 1;
         let pb = notifier
             .multi_progress
             .add(ProgressBar::new(num_step_scripts as u64));
@@ -97,9 +97,9 @@ pub fn create_console_notifier(run_status: &RunStatus) -> ConsoleNotifier {
         notifier.progress_bars.push(pb);
         notifier.notify(
             i,
-            step_status.run.as_str(),
-            &step_status.status,
-            &step_status.sha,
+            step_status.step_request.run.as_str(),
+            &step_status.step_response.status,
+            &step_status.step_response.sha,
             false,
         );
         i += 1

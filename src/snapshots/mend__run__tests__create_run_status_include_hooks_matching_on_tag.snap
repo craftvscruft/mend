@@ -3,12 +3,14 @@ source: src/run.rs
 expression: status
 ---
 steps:
-  - run: cmd arg1 arg2
-    run_resolved:
-      - echo Hello before some_tag
-      - "function cmd() {\nresolved $1 $2\n}\ncmd arg1 arg2\n"
-    commit_msg: cmd arg1 arg2
-    sha: ~
-    status: Pending
-    output: ~
+  - step_request:
+      run: cmd arg1 arg2
+      run_resolved:
+        - echo Hello before some_tag
+        - "function cmd() {\nresolved $1 $2\n}\ncmd arg1 arg2\n"
+      commit_msg: cmd arg1 arg2
+    step_response:
+      sha: ~
+      status: Pending
+      output: ~
 
