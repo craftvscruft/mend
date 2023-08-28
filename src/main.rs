@@ -7,9 +7,9 @@ use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
 use crate::progress::{create_console_notifier, Notify};
-use crate::repo::{ensure_worktree, GitRepo};
+use crate::repo::{ensure_worktree, GitRepo, Repo};
 use crate::run::EStatus::Failed;
-use crate::run::{create_run_status_from_mend, EStatus, run_step, ShellExecutor, StepResponse};
+use crate::run::{create_run_status_from_mend, EStatus, Executor, run_step, ShellExecutor, StepRequest, StepResponse};
 
 mod config;
 mod progress;
@@ -110,25 +110,29 @@ fn drive(mend: &Mend) {
         }
 
         let mut executor = ShellExecutor {};
-        let mut step_i: usize = 0;
-        for step_request in step_requests {
-            let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
-            run_step(
-                &mut worktree_repo,
-                &mut executor,
-                &mut notifier,
-                step_i,
-                &step_request,
-                &mut step_response,
-            );
-            step_i += 1;
-            if step_response.status == Failed {
-                println!("Failed on {:?}", step_request);
-                println!("Response {:?}", step_response);
-                break;
-            }
-        }
+        run_all_steps(step_requests, &mut notifier, &mut worktree_repo, &mut executor);
         notifier.notify_done()
+    }
+}
+
+fn run_all_steps<R: Repo, E: Executor, N: Notify>(step_requests: Vec<StepRequest>, notifier: &mut N, worktree_repo: &mut R, executor: &mut E) {
+    let mut step_i: usize = 0;
+    for step_request in step_requests {
+        let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
+        run_step(
+            worktree_repo,
+            executor,
+            notifier,
+            step_i,
+            &step_request,
+            &mut step_response,
+        );
+        step_i += 1;
+        if step_response.status == Failed {
+            println!("Failed on {:?}", step_request);
+            println!("Response {:?}", step_response);
+            break;
+        }
     }
 }
 
