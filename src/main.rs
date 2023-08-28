@@ -20,10 +20,10 @@ mod run;
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     #[arg(short='f', long="file")]
-    file: Option<String>,
+    pub file: Option<String>,
 
     #[arg(long="dry-run")]
-    dry_run: bool
+    pub dry_run: bool
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Mend {
@@ -157,9 +157,9 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
     };
     let merged_mend = config::load_mend(config_path)?;
     if cli.dry_run {
-        drive(&merged_mend)
-    } else {
         eprintln!("Dry run, skipping")
+    } else {
+        drive(&merged_mend)
     }
     Ok(())
 }
@@ -176,6 +176,7 @@ fn extend_mend(merged_mend: &mut Mend, include_mend: Mend) {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::path::PathBuf;
     use clap::Parser;
 
@@ -196,22 +197,30 @@ mod tests {
     }
 
     #[test]
+    fn cli_parse_dry_run() {
+        let cli = Cli::parse_from(vec!["mend", "--dry-run"]);
+        assert!(cli.dry_run);
+    }
+
+    #[test]
     fn cli_fails_loading_default_file() {
-        let result = run(&Cli::parse_from(vec!["--dry-run"]));
+        // Change out of current dir in case we have a mend.toml there.
+        assert!(env::set_current_dir(&path_from_manifest("tests/data")).is_ok());
+        let result = run(&Cli::parse_from(vec!["mend", "--dry-run"]));
         assert!(result.is_err());
         insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
     }
 
     #[test]
     fn cli_fails_loading_specified_file() {
-        let result = run(&Cli::parse_from(vec!["--dry-run", "-f", path_from_manifest("tests/data/not-there.toml").to_str().unwrap()]));
+        let result = run(&Cli::parse_from(vec!["mend", "--dry-run", "-f", path_from_manifest("tests/data/not-there.toml").to_str().unwrap()]));
         assert!(result.is_err());
         insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
     }
 
     #[test]
     fn cli_fails_loading_missing_include() {
-        let result = run(&Cli::parse_from(vec!["--dry-run", "-f", path_from_manifest("tests/data/missing-include.toml").to_str().unwrap()]));
+        let result = run(&Cli::parse_from(vec!["mend", "--dry-run", "-f", path_from_manifest("tests/data/missing-include.toml").to_str().unwrap()]));
         assert!(result.is_err());
         insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
     }
