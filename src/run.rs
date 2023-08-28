@@ -303,7 +303,7 @@ mod tests {
 
         fn reset_hard(&mut self) -> anyhow::Result<()> {
             let logger_ref_cell: &RefCell<TestLogger> = self.logger.borrow();
-            logger_ref_cell.borrow_mut().log(format!("Repo reset hard"));
+            logger_ref_cell.borrow_mut().log("Repo reset hard".to_string());
             Ok(())
         }
 
@@ -322,7 +322,7 @@ mod tests {
 
 
     impl Executor for FakeExecutor {
-        fn run_script(&mut self, cwd: &Path, script: &str) -> anyhow::Result<Output> {
+        fn run_script(&mut self, _cwd: &Path, script: &str) -> anyhow::Result<Output> {
             let cmd = if self.succeed {
                 "echo".to_string()
             } else {
@@ -344,7 +344,7 @@ mod tests {
 
         fn notify_done(&self) {
             let logger_ref_cell: &RefCell<TestLogger> = self.logger.borrow();
-            logger_ref_cell.borrow_mut().log(format!("Notify done"))
+            logger_ref_cell.borrow_mut().log("Notify done".to_string())
         }
     }
     struct TestLogger {

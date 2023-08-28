@@ -126,7 +126,7 @@ fn expand_path(repo_dir_raw: &Path) -> PathBuf {
 fn run(cli: &Cli) {
     match config::load_mend(cli) {
         Ok(merged_mend) => match toml::to_string_pretty(&merged_mend) {
-            Ok(text) => {
+            Ok(_text) => {
                 // println!("{}", text);
                 drive(&merged_mend)
             }
