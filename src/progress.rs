@@ -3,13 +3,15 @@ use std::time::Instant;
 use console::{Emoji, Style};
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 
-use crate::run::{EStatus, StepRequest};
+use crate::run::{EStatus, StepRequest, StepResponse};
 
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
+static WARN: Emoji<'_, '_> = Emoji("⚠️ ", "(X)");
 
 pub trait Notify {
     fn notify(&mut self, i: usize, run: &str, status: &EStatus, sha: &Option<String>, inc: bool);
     fn notify_done(&self);
+    fn notify_failure(&self, failed_request: &StepRequest, failed_response: &StepResponse);
 }
 
 pub struct ConsoleNotifier {
@@ -68,12 +70,24 @@ impl Notify for ConsoleNotifier {
         }
     }
     fn notify_done(&self) {
-        // let _ = self.multi_progress.clear();
         println!(
             "{} Done in {}",
             SPARKLE,
             HumanDuration(self.started.elapsed())
         );
+    }
+
+    fn notify_failure(&self, failed_request: &StepRequest, failed_response: &StepResponse) {
+        println!(
+            "{} Failed in {}\nRunning:\n{:?}Output:\n",
+            WARN,
+            HumanDuration(self.started.elapsed()),
+            failed_request.run_resolved
+        );
+        if let Some(output) = &failed_response.output {
+            println!("{}", output)
+        }
+
     }
 }
 

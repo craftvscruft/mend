@@ -109,8 +109,15 @@ fn drive(mend: &Mend) {
         }
 
         let mut executor = ShellExecutor {};
-        run::run_all_steps(step_requests, &mut notifier, &mut worktree_repo, &mut executor);
-        notifier.notify_done()
+        match run::run_all_steps(step_requests, &mut notifier, &mut worktree_repo, &mut executor) {
+            Ok(_) => {
+                notifier.notify_done()
+            }
+            Err((step_request, step_response)) => {
+                notifier.notify_failure(&step_request, &step_response)
+            }
+        }
+
     }
 }
 

@@ -107,7 +107,8 @@ pub fn create_run_status_from_mend(mend: &Mend) -> Vec<StepRequest> {
             }).collect()
 }
 
-pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(step_requests: Vec<StepRequest>, notifier: &mut N, worktree_repo: &mut R, executor: &mut E) {
+pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(step_requests: Vec<StepRequest>, notifier: &mut N, worktree_repo: &mut R, executor: &mut E)
+    -> Result<(), (StepRequest, StepResponse)>{
     let mut step_i: usize = 0;
     for step_request in step_requests {
         let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
@@ -121,11 +122,10 @@ pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(step_requests: Vec<StepReq
         );
         step_i += 1;
         if step_response.status == Failed {
-            println!("Failed on {:?}", step_request);
-            println!("Response {:?}", step_response);
-            break;
+            return Err((step_request, step_response))
         }
     }
+    return Ok(())
 }
 
 pub fn run_step<R: Repo, E: Executor, N: Notify>(
@@ -229,7 +229,7 @@ pub fn run_command_with_output(
 mod tests {
     use crate::progress::Notify;
     use crate::repo::Repo;
-    use crate::run::{create_run_status_from_mend, EStatus, Executor, run_command_with_output, run_step, StepRequest, StepResponse};
+    use crate::run::{create_run_status_from_mend, EStatus, Executor, run_all_steps, run_command_with_output, run_step, StepRequest, StepResponse};
     use crate::{Hook, Mend, Recipe};
     use std::borrow::Borrow;
     use std::cell::RefCell;
@@ -414,6 +414,10 @@ mod tests {
             let logger_ref_cell: &RefCell<TestLogger> = self.logger.borrow();
             logger_ref_cell.borrow_mut().log("Notify done".to_string())
         }
+        fn notify_failure(&self, _step_request: &StepRequest, _step_response: &StepResponse) {
+            let logger_ref_cell: &RefCell<TestLogger> = self.logger.borrow();
+            logger_ref_cell.borrow_mut().log("Notify failure".to_string())
+        }
     }
     struct TestLogger {
         messages: Vec<String>,
@@ -474,6 +478,62 @@ mod tests {
         // The intent here is is to log is to log all interactions with the  fake objects in one vec.
         // I may have done something silly here to get the compiler to accept it. Better ideas?
         let logger_rc = Rc::new(RefCell::new(TestLogger { messages: vec![] }));
+        run_step(
+            &mut FakeRepo {
+                logger: logger_rc.clone(),
+            },
+            &mut FakeExecutor {
+                logger: logger_rc.clone(),
+                succeed: false,
+            },
+            &mut FakeNotifier {
+                logger: logger_rc.clone(),
+            },
+            1,
+            &step_request,
+            &mut step_response,
+        );
+        assert_eq!(step_response.status, EStatus::Failed);
+        let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
+        insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
+        assert_eq!(step_response.sha, None);
+    }
+
+    #[test]
+    fn run_all_steps_reports_ok_when_steps_pass() {
+        let scripts = vec![
+            "..before..".to_string(),
+            "..cmd..".to_string(),
+            "..after..".to_string(),
+        ];
+        let step_request = StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() };
+        let logger_rc = Rc::new(RefCell::new(TestLogger { messages: vec![] }));
+        let step_requests = vec![step_request];
+        let result = run_all_steps(
+            step_requests,
+            &mut FakeNotifier {
+                logger: logger_rc.clone(),
+            },
+            &mut FakeRepo {
+                logger: logger_rc.clone(),
+            },
+            &mut FakeExecutor {
+                logger: logger_rc.clone(),
+                succeed: true,
+            }
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn run_all_steps_reports_failure_with_failed_step() {
+        let scripts = vec![
+            "..before..".to_string(),
+            "..cmd..".to_string(),
+            "..after..".to_string(),
+        ];
+        let step_request = StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() };
+        let logger_rc = Rc::new(RefCell::new(TestLogger { messages: vec![] }));
         let mut repo: FakeRepo = FakeRepo {
             logger: logger_rc.clone(),
         };
@@ -484,17 +544,19 @@ mod tests {
         let mut notifier = FakeNotifier {
             logger: logger_rc.clone(),
         };
-        run_step(
-            &mut repo,
-            &mut executor,
+        let step_requests = vec![step_request];
+        let result = run_all_steps(
+            step_requests,
             &mut notifier,
-            1,
-            &step_request,
-            &mut step_response,
+            &mut repo,
+            &mut executor
         );
-        assert_eq!(step_response.status, EStatus::Failed);
+        assert!(result.is_err());
+        let (failed_step_request, failed_step_response) = result.err().unwrap();
+        assert_eq!(failed_step_request.run, "cmd".to_string());
+        assert_eq!(failed_step_response.status, EStatus::Failed);
         let logger_ref_cell: &RefCell<TestLogger> = logger_rc.borrow();
         insta::assert_yaml_snapshot!(logger_ref_cell.borrow().messages);
-        assert_eq!(step_response.sha, None);
+        assert_eq!(failed_step_response.sha, None);
     }
 }
