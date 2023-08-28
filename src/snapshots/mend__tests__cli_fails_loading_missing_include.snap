@@ -1,5 +1,5 @@
 ---
 source: src/main.rs
-expression: "format!(\"{:#}\", result.err().unwrap())"
+expression: "strip_manifest_path_from_text(format!(\"{:#}\", result.err().unwrap()))"
 ---
-Could not read include file `not-there.toml` included from `/Users/rmyers/dev/mend/tests/data/missing-include.toml`: No such file or directory (os error 2)
+Could not read include file `not-there.toml` included from `<MANIFEST_DIR>/tests/data/missing-include.toml`: No such file or directory (os error 2)

@@ -1,5 +1,5 @@
 ---
 source: src/main.rs
-expression: "format!(\"{:#}\", result.err().unwrap())"
+expression: "strip_manifest_path_from_text(format!(\"{:#}\", result.err().unwrap()))"
 ---
-Specified file /Users/rmyers/dev/mend/tests/data/not-there.toml doesn't exist
+Specified file <MANIFEST_DIR>/tests/data/not-there.toml doesn't exist

@@ -192,6 +192,11 @@ mod tests {
         toml_path
     }
 
+    fn strip_manifest_path_from_text(text: String) -> String {
+        // So that snapshots won't differ in tests run on different machines
+        text.replace(env!("CARGO_MANIFEST_DIR"), "<MANIFEST_DIR>")
+    }
+
     #[test]
     fn load_mend_from_toml() {
         let toml_path = path_from_manifest("examples/mend.toml");
@@ -225,7 +230,7 @@ mod tests {
                 .unwrap(),
         ]));
         assert!(result.is_err());
-        insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
+        insta::assert_snapshot!(strip_manifest_path_from_text(format!("{:#}", result.err().unwrap())));
     }
 
     #[test]
@@ -239,6 +244,6 @@ mod tests {
                 .unwrap(),
         ]));
         assert!(result.is_err());
-        insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
+        insta::assert_snapshot!(strip_manifest_path_from_text(format!("{:#}", result.err().unwrap())));
     }
 }
