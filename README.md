@@ -1,4 +1,5 @@
 # Mend
+![Tests](https://github.com/craftvscruft/mend/actions/workflows/ci.yml/badge.svg?branch=main)
 [![License: APACHE](https://img.shields.io/github/license/craftvscruft/mend)](https://github.com/craftvscruft/mend/blob/main/LICENSE)
 
 > Scripted disciplined refactoring for legacy code
