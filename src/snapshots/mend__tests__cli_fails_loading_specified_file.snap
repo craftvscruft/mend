@@ -1,0 +1,5 @@
+---
+source: src/main.rs
+expression: "format!(\"{:#}\", result.err().unwrap())"
+---
+Specified file /Users/rmyers/dev/mend/tests/data/not-there.toml doesn't exist

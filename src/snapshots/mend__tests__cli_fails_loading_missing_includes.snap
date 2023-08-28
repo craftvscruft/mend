@@ -1,0 +1,5 @@
+---
+source: src/main.rs
+expression: "format!(\"{:#}\", result.err().unwrap())"
+---
+Could not read file `/Users/rmyers/dev/mend/tests/data/missing-includes.toml`: No such file or directory (os error 2)

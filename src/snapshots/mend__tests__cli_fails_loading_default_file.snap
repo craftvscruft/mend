@@ -1,0 +1,5 @@
+---
+source: src/main.rs
+expression: "format!(\"{:#}\", result.err().unwrap())"
+---
+No mend.toml found, please specify one with -f or create one with `mend init`

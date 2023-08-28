@@ -4,12 +4,12 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
+use anyhow::bail;
 
 use crate::progress::{create_console_notifier, Notify};
 use crate::repo::{ensure_worktree, GitRepo};
 use crate::run::EStatus::Failed;
 use crate::run::{create_run_status_from_mend, run_step, ShellExecutor};
-use std::process::exit;
 
 mod config;
 mod progress;
@@ -19,8 +19,11 @@ mod run;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
-    #[arg(short='f', long="file", default_value_t=String::from("mend.toml"))]
-    file: String,
+    #[arg(short='f', long="file")]
+    file: Option<String>,
+
+    #[arg(long="dry-run")]
+    dry_run: bool
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Mend {
@@ -66,7 +69,15 @@ pub struct Hook {
 }
 
 fn main() {
-    run(&Cli::parse());
+    match run(&Cli::parse()) {
+        Ok(_) => {
+            std::process::exit(0);
+        }
+        Err(err) => {
+                eprintln!("{:#}", err);
+            std::process::exit(1);
+        }
+    }
 }
 
 fn drive(mend: &Mend) {
@@ -124,23 +135,33 @@ fn expand_path(repo_dir_raw: &Path) -> PathBuf {
     cow.to_path_buf()
 }
 
-fn run(cli: &Cli) {
-    match config::load_mend(cli) {
-        Ok(merged_mend) => match toml::to_string_pretty(&merged_mend) {
-            Ok(_text) => {
-                // println!("{}", text);
-                drive(&merged_mend)
+fn run(cli: &Cli) -> anyhow::Result<()> {
+    let config_path = match &cli.file {
+        Some(file) => {
+            let path = Path::new(file.as_str());
+            if path.exists() {
+                path
+            } else {
+                bail!("Specified file {} doesn't exist", file)
             }
-            Err(e) => {
-                eprintln!("{e}");
-                exit(1);
-            }
-        },
-        Err(e) => {
-            eprintln!("{e}");
-            exit(1);
+
         }
+        None => {
+            let toml_path = Path::new("mend.toml");
+            if toml_path.exists() {
+                toml_path
+            } else {
+                bail!("No mend.toml found, please specify one with -f or create one with `mend init`")
+            }
+        }
+    };
+    let merged_mend = config::load_mend(config_path)?;
+    if cli.dry_run {
+        drive(&merged_mend)
+    } else {
+        eprintln!("Dry run, skipping")
     }
+    Ok(())
 }
 
 fn extend_mend(merged_mend: &mut Mend, include_mend: Mend) {
@@ -156,18 +177,42 @@ fn extend_mend(merged_mend: &mut Mend, include_mend: Mend) {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use clap::Parser;
 
     use crate::config::load_mend;
-    use crate::Cli;
+    use crate::{Cli, run};
+
+    fn path_from_manifest(rel_path: &str) -> PathBuf {
+        let mut toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        toml_path.push(rel_path);
+        toml_path
+    }
 
     #[test]
     fn load_mend_from_toml() {
-        let mut toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        toml_path.push("examples/mend.toml");
-        let args = Cli {
-            file: String::from(toml_path.to_str().unwrap()),
-        };
-        let loaded = load_mend(&args);
+        let toml_path = path_from_manifest("examples/mend.toml");
+        let loaded = load_mend(toml_path.as_path());
         insta::assert_yaml_snapshot!(loaded.expect("Failed loading"));
+    }
+
+    #[test]
+    fn cli_fails_loading_default_file() {
+        let result = run(&Cli::parse_from(vec!["--dry-run"]));
+        assert!(result.is_err());
+        insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
+    }
+
+    #[test]
+    fn cli_fails_loading_specified_file() {
+        let result = run(&Cli::parse_from(vec!["--dry-run", "-f", path_from_manifest("tests/data/not-there.toml").to_str().unwrap()]));
+        assert!(result.is_err());
+        insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
+    }
+
+    #[test]
+    fn cli_fails_loading_missing_include() {
+        let result = run(&Cli::parse_from(vec!["--dry-run", "-f", path_from_manifest("tests/data/missing-include.toml").to_str().unwrap()]));
+        assert!(result.is_err());
+        insta::assert_snapshot!(format!("{:#}", result.err().unwrap()));
     }
 }
