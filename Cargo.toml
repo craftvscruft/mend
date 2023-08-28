@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 clap = { version = "4.0.29", features = ["derive"] }
-common_failures = "0.1.1"
 console = "0.15.7"
 indicatif = "0.17.6"
 serde = { version = "1.0.187", features = ["derive"] }
