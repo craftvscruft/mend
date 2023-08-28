@@ -107,6 +107,27 @@ pub fn create_run_status_from_mend(mend: &Mend) -> Vec<StepRequest> {
             }).collect()
 }
 
+pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(step_requests: Vec<StepRequest>, notifier: &mut N, worktree_repo: &mut R, executor: &mut E) {
+    let mut step_i: usize = 0;
+    for step_request in step_requests {
+        let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
+        run_step(
+            worktree_repo,
+            executor,
+            notifier,
+            step_i,
+            &step_request,
+            &mut step_response,
+        );
+        step_i += 1;
+        if step_response.status == Failed {
+            println!("Failed on {:?}", step_request);
+            println!("Response {:?}", step_response);
+            break;
+        }
+    }
+}
+
 pub fn run_step<R: Repo, E: Executor, N: Notify>(
     repo: &mut R,
     executor: &mut E,
@@ -208,7 +229,7 @@ pub fn run_command_with_output(
 mod tests {
     use crate::progress::Notify;
     use crate::repo::Repo;
-    use crate::run::{create_run_status_from_mend, run_command_with_output, run_step, EStatus, Executor, StepRequest, StepResponse};
+    use crate::run::{create_run_status_from_mend, EStatus, Executor, run_command_with_output, run_step, StepRequest, StepResponse};
     use crate::{Hook, Mend, Recipe};
     use std::borrow::Borrow;
     use std::cell::RefCell;
