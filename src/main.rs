@@ -82,7 +82,8 @@ fn drive(mend: &Mend) {
     // Multiple concurrent runs will stomp on each other. Choose unique dir?
     let base_repo_dir = expand_path(repo_dir_raw);
 
-    if let Ok(worktree_dir) = ensure_worktree(base_repo_dir.as_path(), ".mend/worktree2", &from.sha) {
+    if let Ok(worktree_dir) = ensure_worktree(base_repo_dir.as_path(), ".mend/worktree2", &from.sha)
+    {
         if !worktree_dir.exists() {
             eprintln!(
                 "Worktree dir {} doesn't exist",
@@ -90,7 +91,7 @@ fn drive(mend: &Mend) {
             );
         }
         let mut worktree_repo = GitRepo {
-            repo_dir: worktree_dir
+            repo_dir: worktree_dir,
         };
         for (key, value) in &mend.env {
             let expanded = shellexpand::env(value).unwrap();

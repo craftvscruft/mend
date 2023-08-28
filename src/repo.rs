@@ -46,36 +46,39 @@ pub fn ensure_worktree(
 }
 
 pub struct GitRepo {
-    pub repo_dir: PathBuf
+    pub repo_dir: PathBuf,
 }
 
 impl Repo for GitRepo {
-
     fn dir(&self) -> &Path {
         &self.repo_dir
     }
     fn commit_all(&mut self, message: &str) -> anyhow::Result<()> {
-        let output =
-            run_command_with_output(&self.repo_dir, "git".to_string(), vec!["commit", "-am", message])?;
+        let output = run_command_with_output(
+            &self.repo_dir,
+            "git".to_string(),
+            vec!["commit", "-am", message],
+        )?;
         if !output.status.success() {
             bail!(
-            "Failed to commit, output:\n{}{}",
-            String::from_utf8_lossy(&output.stdout).as_ref(),
-            String::from_utf8_lossy(&output.stderr).as_ref()
-        );
+                "Failed to commit, output:\n{}{}",
+                String::from_utf8_lossy(&output.stdout).as_ref(),
+                String::from_utf8_lossy(&output.stderr).as_ref()
+            );
         } else {
             Ok(())
         }
     }
 
     fn reset_hard(&mut self) -> anyhow::Result<()> {
-        let output = run_command_with_output(&self.repo_dir, "git".to_string(), vec!["reset", "--hard"])?;
+        let output =
+            run_command_with_output(&self.repo_dir, "git".to_string(), vec!["reset", "--hard"])?;
         if !output.status.success() {
             bail!(
-            "Failed to commit, output:\n{}{}",
-            String::from_utf8_lossy(&output.stdout).as_ref(),
-            String::from_utf8_lossy(&output.stderr).as_ref()
-        );
+                "Failed to commit, output:\n{}{}",
+                String::from_utf8_lossy(&output.stdout).as_ref(),
+                String::from_utf8_lossy(&output.stderr).as_ref()
+            );
         } else {
             Ok(())
         }
@@ -93,8 +96,6 @@ impl Repo for GitRepo {
             .parse()?)
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -129,20 +130,22 @@ mod tests {
             .output()
             .expect("Could not git add  myfile");
         let mut base_repo = GitRepo {
-            repo_dir: base_repo_dir.to_path_buf()
+            repo_dir: base_repo_dir.to_path_buf(),
         };
         base_repo.commit_all("Initial").expect("Could not commit");
 
         let short_sha = base_repo.current_short_sha().unwrap();
-        let worktree_dir = ensure_worktree(base_repo_dir, worktree_rel, short_sha.as_str()).unwrap();
+        let worktree_dir =
+            ensure_worktree(base_repo_dir, worktree_rel, short_sha.as_str()).unwrap();
         let mut worktree_repo = GitRepo {
-            repo_dir: worktree_dir
+            repo_dir: worktree_dir,
         };
         worktree_repo.reset_hard().expect("Could not git reset");
 
         assert_eq!(short_sha, worktree_repo.current_short_sha().unwrap());
         // Can call ensure_worktree twice on the same directory
-        ensure_worktree(base_repo_dir, worktree_rel, short_sha.as_str()).expect("could not create worktree");
+        ensure_worktree(base_repo_dir, worktree_rel, short_sha.as_str())
+            .expect("could not create worktree");
         assert_eq!(short_sha, worktree_repo.current_short_sha().unwrap());
         // Hold onto references
         let _ = temp_subdir.close();

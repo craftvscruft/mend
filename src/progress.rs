@@ -27,15 +27,20 @@ impl Notify for ConsoleNotifier {
             let msg = step_status.run.to_string();
             let dim_style: Style = Style::new().dim();
             let sha = match &step_status.sha {
-                None => { "       ".to_string() }
-                Some(sha) => { sha.clone() }
+                None => "       ".to_string(),
+                Some(sha) => sha.clone(),
             };
             let dim_sha = dim_style.apply_to(sha);
             match step_status.status {
                 EStatus::Pending => {
                     let pending_style: Style = Style::new().dim();
                     let styled_status = pending_style.apply_to("Pending");
-                    progress.set_message(format!("{} {} {}", dim_sha, styled_status, dim_style.apply_to(msg)))
+                    progress.set_message(format!(
+                        "{} {} {}",
+                        dim_sha,
+                        styled_status,
+                        dim_style.apply_to(msg)
+                    ))
                 }
                 EStatus::Running => {
                     let running_style: Style = Style::new().cyan();
@@ -45,7 +50,12 @@ impl Notify for ConsoleNotifier {
                 EStatus::Done => {
                     let done_style: Style = Style::new().green();
                     let styled_status = done_style.apply_to("Done   ");
-                    progress.set_message(format!("{} {} {}", dim_sha, styled_status, dim_style.apply_to(msg)));
+                    progress.set_message(format!(
+                        "{} {} {}",
+                        dim_sha,
+                        styled_status,
+                        dim_style.apply_to(msg)
+                    ));
                     progress.finish()
                 }
                 EStatus::Failed => {
