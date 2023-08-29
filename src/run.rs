@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
 use crate::progress::Notify;
 use crate::repo::Repo;
 use crate::run::EStatus::{Done, Failed, Running};
 use crate::{Mend, Recipe};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -14,16 +14,15 @@ use which::which;
 pub struct StepRequest {
     pub run: String,
     pub run_resolved: Vec<String>,
-    pub commit_msg: String
+    pub commit_msg: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct StepResponse {
     pub sha: Option<String>,
     pub status: EStatus,
-    pub output: Option<String>
+    pub output: Option<String>,
 }
-
 
 impl StepResponse {
     pub fn push_output_str(&mut self, text: &str) {
@@ -42,7 +41,11 @@ pub enum EStatus {
     Failed,
 }
 
-fn resolve_step_scripts(instruction: &String, mend: &Mend, matching_recipes: BTreeMap<&String, &Recipe>) -> Vec<String> {
+fn resolve_step_scripts(
+    instruction: &String,
+    mend: &Mend,
+    matching_recipes: BTreeMap<&String, &Recipe>,
+) -> Vec<String> {
     let mut resolved_instruction = "".to_owned();
     let mut scripts = vec![];
     let mut recipe_tags: Vec<String> = vec![];
@@ -96,47 +99,55 @@ fn add_matching_hooks(scripts: &mut Vec<String>, mend: &Mend, key: &str, tags: &
 }
 
 pub fn create_run_status_from_mend(mend: &Mend) -> Vec<StepRequest> {
-    mend
-            .steps
-            .iter()
-            .map({
-                |step_text| {
-                    let instruction = step_text.to_string();
+    mend.steps
+        .iter()
+        .map({
+            |step_text| {
+                let instruction = step_text.to_string();
 
-                    let instruction_trimmed = instruction.trim();
-                    let instruction_recipe_name = instruction_trimmed.split_whitespace().next().unwrap_or_default().to_string();
-                    let matching_recipes : BTreeMap<&String, &Recipe> = mend.recipes.iter()
-                        .filter(|&(recipe_name, _)| (recipe_name.eq(&instruction_recipe_name))).collect();
-                    let commit_msg = render_commit_message(instruction_trimmed, &matching_recipes);
-                    StepRequest {
-                        run: step_text.to_string(),
-                        run_resolved: resolve_step_scripts(&instruction, mend, matching_recipes),
-                        commit_msg
-                    }
+                let instruction_trimmed = instruction.trim();
+                let instruction_recipe_name = instruction_trimmed
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or_default()
+                    .to_string();
+                let matching_recipes: BTreeMap<&String, &Recipe> = mend
+                    .recipes
+                    .iter()
+                    .filter(|&(recipe_name, _)| (recipe_name.eq(&instruction_recipe_name)))
+                    .collect();
+                let commit_msg = render_commit_message(instruction_trimmed, &matching_recipes);
+                StepRequest {
+                    run: step_text.to_string(),
+                    run_resolved: resolve_step_scripts(&instruction, mend, matching_recipes),
+                    commit_msg,
                 }
-            }).collect()
+            }
+        })
+        .collect()
 }
 
-fn render_commit_message(instruction: &str, matching_recipes: &BTreeMap<&String, &Recipe>) -> String {
+fn render_commit_message(
+    instruction: &str,
+    matching_recipes: &BTreeMap<&String, &Recipe>,
+) -> String {
     let commit_template = match matching_recipes.values().next() {
-        None => { instruction }
-        Some(recipe) => {
-            match &recipe.commit_template {
-                None => { instruction }
-                Some(template) => { template }
-            }
-        }
+        None => instruction,
+        Some(recipe) => match &recipe.commit_template {
+            None => instruction,
+            Some(template) => template,
+        },
     };
     // For now splitting on whitespace, perhaps shlex parse later?
-    let args : Vec<&str> = instruction.split_whitespace().collect();
+    let args: Vec<&str> = instruction.split_whitespace().collect();
     let context = {
         |s: &_| {
             eprintln!("resolving {}", s);
-            if let Ok(arg_num) =  str::parse::<i16>(s) {
+            if let Ok(arg_num) = str::parse::<i16>(s) {
                 eprintln!("parsed arg_num {}", arg_num);
                 if arg_num >= 1 && arg_num < args.len() as i16 {
                     if let Some(found_arg) = args.get(arg_num as usize) {
-                        return Some(found_arg.to_string())
+                        return Some(found_arg.to_string());
                     }
                 }
             }
@@ -148,11 +159,19 @@ fn render_commit_message(instruction: &str, matching_recipes: &BTreeMap<&String,
     string
 }
 
-pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(step_requests: Vec<StepRequest>, notifier: &mut N, worktree_repo: &mut R, executor: &mut E)
-    -> Result<(), (StepRequest, StepResponse)>{
+pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(
+    step_requests: Vec<StepRequest>,
+    notifier: &mut N,
+    worktree_repo: &mut R,
+    executor: &mut E,
+) -> Result<(), (StepRequest, StepResponse)> {
     let mut step_i: usize = 0;
     for step_request in step_requests {
-        let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
+        let mut step_response = StepResponse {
+            sha: None,
+            status: EStatus::Pending,
+            output: None,
+        };
         run_step(
             worktree_repo,
             executor,
@@ -163,10 +182,10 @@ pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(step_requests: Vec<StepReq
         );
         step_i += 1;
         if step_response.status == Failed {
-            return Err((step_request, step_response))
+            return Err((step_request, step_response));
         }
     }
-    return Ok(())
+    return Ok(());
 }
 
 pub fn run_step<R: Repo, E: Executor, N: Notify>(
@@ -222,7 +241,9 @@ pub fn run_step<R: Repo, E: Executor, N: Notify>(
 
     if step_response.status != Failed {
         step_response.status = Done;
-        step_response.push_output_str(format!("Committing with message '{}'", step_request.commit_msg).as_str());
+        step_response.push_output_str(
+            format!("Committing with message '{}'", step_request.commit_msg).as_str(),
+        );
         match repo.commit_all(step_request.commit_msg.as_str()) {
             Ok(_) => {
                 if let Ok(sha) = repo.current_short_sha() {
@@ -270,7 +291,10 @@ pub fn run_command_with_output(
 mod tests {
     use crate::progress::Notify;
     use crate::repo::Repo;
-    use crate::run::{create_run_status_from_mend, EStatus, Executor, run_all_steps, run_command_with_output, run_step, StepRequest, StepResponse};
+    use crate::run::{
+        create_run_status_from_mend, run_all_steps, run_command_with_output, run_step, EStatus,
+        Executor, StepRequest, StepResponse,
+    };
     use crate::{Hook, Mend, Recipe};
     use std::borrow::Borrow;
     use std::cell::RefCell;
@@ -335,7 +359,10 @@ mod tests {
         );
         let step_requests = create_run_status_from_mend(&mend);
         assert_eq!(step_requests.len(), 1);
-        assert_eq!(step_requests.get(0).unwrap().commit_msg, "r - Rename arg1 to arg2");
+        assert_eq!(
+            step_requests.get(0).unwrap().commit_msg,
+            "r - Rename arg1 to arg2"
+        );
     }
 
     #[test]
@@ -475,7 +502,9 @@ mod tests {
         }
         fn notify_failure(&self, _step_request: &StepRequest, _step_response: &StepResponse) {
             let logger_ref_cell: &RefCell<TestLogger> = self.logger.borrow();
-            logger_ref_cell.borrow_mut().log("Notify failure".to_string())
+            logger_ref_cell
+                .borrow_mut()
+                .log("Notify failure".to_string())
         }
     }
     struct TestLogger {
@@ -494,8 +523,16 @@ mod tests {
             "..cmd..".to_string(),
             "..after..".to_string(),
         ];
-        let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
-        let step_request = StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() };
+        let mut step_response = StepResponse {
+            sha: None,
+            status: EStatus::Pending,
+            output: None,
+        };
+        let step_request = StepRequest {
+            run: "cmd".to_string(),
+            run_resolved: scripts.clone(),
+            commit_msg: "..msg..".to_string(),
+        };
 
         // The intent here is is to log is to log all interactions with the  fake objects in one vec.
         // I may have done something silly here to get the compiler to accept it. Better ideas?
@@ -531,8 +568,16 @@ mod tests {
             "..cmd..".to_string(),
             "..after..".to_string(),
         ];
-        let step_request = StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() };
-        let mut step_response = StepResponse { sha: None, status: EStatus::Pending, output: None };
+        let step_request = StepRequest {
+            run: "cmd".to_string(),
+            run_resolved: scripts.clone(),
+            commit_msg: "..msg..".to_string(),
+        };
+        let mut step_response = StepResponse {
+            sha: None,
+            status: EStatus::Pending,
+            output: None,
+        };
 
         // The intent here is is to log is to log all interactions with the  fake objects in one vec.
         // I may have done something silly here to get the compiler to accept it. Better ideas?
@@ -565,7 +610,11 @@ mod tests {
             "..cmd..".to_string(),
             "..after..".to_string(),
         ];
-        let step_request = StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() };
+        let step_request = StepRequest {
+            run: "cmd".to_string(),
+            run_resolved: scripts.clone(),
+            commit_msg: "..msg..".to_string(),
+        };
         let logger_rc = Rc::new(RefCell::new(TestLogger { messages: vec![] }));
         let step_requests = vec![step_request];
         let result = run_all_steps(
@@ -579,7 +628,7 @@ mod tests {
             &mut FakeExecutor {
                 logger: logger_rc.clone(),
                 succeed: true,
-            }
+            },
         );
         assert!(result.is_ok());
     }
@@ -591,7 +640,11 @@ mod tests {
             "..cmd..".to_string(),
             "..after..".to_string(),
         ];
-        let step_request = StepRequest { run: "cmd".to_string(), run_resolved: scripts.clone(), commit_msg: "..msg..".to_string() };
+        let step_request = StepRequest {
+            run: "cmd".to_string(),
+            run_resolved: scripts.clone(),
+            commit_msg: "..msg..".to_string(),
+        };
         let logger_rc = Rc::new(RefCell::new(TestLogger { messages: vec![] }));
         let mut repo: FakeRepo = FakeRepo {
             logger: logger_rc.clone(),
@@ -604,12 +657,7 @@ mod tests {
             logger: logger_rc.clone(),
         };
         let step_requests = vec![step_request];
-        let result = run_all_steps(
-            step_requests,
-            &mut notifier,
-            &mut repo,
-            &mut executor
-        );
+        let result = run_all_steps(step_requests, &mut notifier, &mut repo, &mut executor);
         assert!(result.is_err());
         let (failed_step_request, failed_step_response) = result.err().unwrap();
         assert_eq!(failed_step_request.run, "cmd".to_string());
