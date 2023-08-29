@@ -9,7 +9,7 @@ pub fn load_mend(file: &Path) -> anyhow::Result<Mend> {
     let parent_dir = &file.parent().unwrap_or(Path::new(""));
 
     let contents =
-        fs::read_to_string(&file).with_context(|| format!("Could not read file `{}`", file_str))?;
+        fs::read_to_string(file).with_context(|| format!("Could not read file `{}`", file_str))?;
 
     let main_mend: Mend = toml::from_str(&contents)
         .with_context(|| format!("Unable to load data from `{}`", file_str))?;

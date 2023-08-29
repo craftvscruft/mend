@@ -87,7 +87,6 @@ impl Notify for ConsoleNotifier {
         if let Some(output) = &failed_response.output {
             println!("{}", output)
         }
-
     }
 }
 

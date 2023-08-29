@@ -109,15 +109,17 @@ fn drive(mend: &Mend) {
         }
 
         let mut executor = ShellExecutor {};
-        match run::run_all_steps(step_requests, &mut notifier, &mut worktree_repo, &mut executor) {
-            Ok(_) => {
-                notifier.notify_done()
-            }
+        match run::run_all_steps(
+            step_requests,
+            &mut notifier,
+            &mut worktree_repo,
+            &mut executor,
+        ) {
+            Ok(_) => notifier.notify_done(),
             Err((step_request, step_response)) => {
                 notifier.notify_failure(&step_request, &step_response)
             }
         }
-
     }
 }
 
@@ -173,7 +175,7 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::config::load_mend;
-    use crate::{Cli, run};
+    use crate::{run, Cli};
 
     fn path_from_manifest(rel_path: &str) -> PathBuf {
         let mut toml_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -219,7 +221,10 @@ mod tests {
                 .unwrap(),
         ]));
         assert!(result.is_err());
-        insta::assert_snapshot!(strip_manifest_path_from_text(format!("{:#}", result.err().unwrap())));
+        insta::assert_snapshot!(strip_manifest_path_from_text(format!(
+            "{:#}",
+            result.err().unwrap()
+        )));
     }
 
     #[test]
@@ -233,6 +238,9 @@ mod tests {
                 .unwrap(),
         ]));
         assert!(result.is_err());
-        insta::assert_snapshot!(strip_manifest_path_from_text(format!("{:#}", result.err().unwrap())));
+        insta::assert_snapshot!(strip_manifest_path_from_text(format!(
+            "{:#}",
+            result.err().unwrap()
+        )));
     }
 }
