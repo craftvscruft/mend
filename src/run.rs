@@ -1,7 +1,8 @@
+use std::collections::BTreeMap;
 use crate::progress::Notify;
 use crate::repo::Repo;
 use crate::run::EStatus::{Done, Failed, Running};
-use crate::Mend;
+use crate::{Mend, Recipe};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -23,6 +24,7 @@ pub struct StepResponse {
     pub output: Option<String>
 }
 
+
 impl StepResponse {
     pub fn push_output_str(&mut self, text: &str) {
         match &self.output {
@@ -40,17 +42,16 @@ pub enum EStatus {
     Failed,
 }
 
-fn resolve_step_scripts(instruction: String, mend: &Mend) -> Vec<String> {
+fn resolve_step_scripts(instruction: &String, mend: &Mend, matching_recipes: BTreeMap<&String, &Recipe>) -> Vec<String> {
     let mut resolved_instruction = "".to_owned();
     let mut scripts = vec![];
     let mut recipe_tags: Vec<String> = vec![];
-    for (recipe_name, recipe) in &mend.recipes {
-        if instruction.contains(recipe_name.as_str()) {
-            let recipe_fn = format!("function {}() {{\n{}\n}}\n", recipe_name, recipe.run);
-            resolved_instruction.push_str(&recipe_fn);
-            for tag in &recipe.tags {
-                recipe_tags.push(tag.to_string())
-            }
+
+    for (recipe_name, recipe) in matching_recipes {
+        let recipe_fn = format!("function {}() {{\n{}\n}}\n", recipe_name, recipe.run);
+        resolved_instruction.push_str(&recipe_fn);
+        for tag in &recipe.tags {
+            recipe_tags.push(tag.to_string())
         }
     }
     resolved_instruction.push_str(&instruction);
@@ -99,12 +100,52 @@ pub fn create_run_status_from_mend(mend: &Mend) -> Vec<StepRequest> {
             .steps
             .iter()
             .map({
-                |step_text| StepRequest {
-                    run: step_text.to_string(),
-                    run_resolved: resolve_step_scripts(step_text.to_string(), mend),
-                    commit_msg: step_text.to_string()
+                |step_text| {
+                    let instruction = step_text.to_string();
+
+                    let instruction_trimmed = instruction.trim();
+                    let instruction_recipe_name = instruction_trimmed.split_whitespace().next().unwrap_or_default().to_string();
+                    let matching_recipes : BTreeMap<&String, &Recipe> = mend.recipes.iter()
+                        .filter(|&(recipe_name, _)| (recipe_name.eq(&instruction_recipe_name))).collect();
+                    let commit_msg = render_commit_message(instruction_trimmed, &matching_recipes);
+                    StepRequest {
+                        run: step_text.to_string(),
+                        run_resolved: resolve_step_scripts(&instruction, mend, matching_recipes),
+                        commit_msg
+                    }
                 }
             }).collect()
+}
+
+fn render_commit_message(instruction: &str, matching_recipes: &BTreeMap<&String, &Recipe>) -> String {
+    let commit_template = match matching_recipes.values().next() {
+        None => { instruction }
+        Some(recipe) => {
+            match &recipe.commit_template {
+                None => { instruction }
+                Some(template) => { template }
+            }
+        }
+    };
+    // For now splitting on whitespace, perhaps shlex parse later?
+    let args : Vec<&str> = instruction.split_whitespace().collect();
+    let context = {
+        |s: &_| {
+            eprintln!("resolving {}", s);
+            if let Ok(arg_num) =  str::parse::<i16>(s) {
+                eprintln!("parsed arg_num {}", arg_num);
+                if arg_num >= 1 && arg_num < args.len() as i16 {
+                    if let Some(found_arg) = args.get(arg_num as usize) {
+                        return Some(found_arg.to_string())
+                    }
+                }
+            }
+            std::env::var(s).ok()
+        }
+    };
+    let commit_msg = shellexpand::env_with_context_no_errors(&commit_template, context);
+    let string = commit_msg.to_string();
+    string
 }
 
 pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(step_requests: Vec<StepRequest>, notifier: &mut N, worktree_repo: &mut R, executor: &mut E)
@@ -181,7 +222,7 @@ pub fn run_step<R: Repo, E: Executor, N: Notify>(
 
     if step_response.status != Failed {
         step_response.status = Done;
-        step_response.push_output_str("Committing...");
+        step_response.push_output_str(format!("Committing with message '{}'", step_request.commit_msg).as_str());
         match repo.commit_all(step_request.commit_msg.as_str()) {
             Ok(_) => {
                 if let Ok(sha) = repo.current_short_sha() {
@@ -277,6 +318,24 @@ mod tests {
         let step_requests = create_run_status_from_mend(&mend);
         assert_eq!(step_requests.len(), 1);
         insta::assert_yaml_snapshot!(step_requests);
+    }
+
+    #[test]
+    fn create_run_request_with_recipe_commit_template() {
+        let mut mend = create_mend_with_steps(vec!["rename arg1 arg2".to_string()]);
+
+        mend.recipes.insert(
+            "rename".to_string(),
+            Recipe {
+                run: "rename-cli $1 $2".to_string(),
+                commit_template: Some("r - Rename $1 to $2".to_string()),
+                tag: None,
+                tags: vec![],
+            },
+        );
+        let step_requests = create_run_status_from_mend(&mend);
+        assert_eq!(step_requests.len(), 1);
+        assert_eq!(step_requests.get(0).unwrap().commit_msg, "r - Rename arg1 to arg2");
     }
 
     #[test]
