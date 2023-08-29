@@ -57,7 +57,7 @@ fn resolve_step_scripts(
             recipe_tags.push(tag.to_string())
         }
     }
-    resolved_instruction.push_str(&instruction);
+    resolved_instruction.push_str(instruction);
     resolved_instruction.push('\n');
 
     add_matching_hooks(&mut scripts, mend, "before_step", &recipe_tags);
@@ -155,8 +155,8 @@ fn render_commit_message(
         }
     };
     let commit_msg = shellexpand::env_with_context_no_errors(&commit_template, context);
-    let string = commit_msg.to_string();
-    string
+    
+    commit_msg.to_string()
 }
 
 pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(
@@ -185,7 +185,7 @@ pub fn run_all_steps<R: Repo, E: Executor, N: Notify>(
             return Err((step_request, step_response));
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 pub fn run_step<R: Repo, E: Executor, N: Notify>(
